@@ -209,6 +209,16 @@ export async function doRunSegmentation() {
 
 export async function doSaveSegmentation() {
   if (!segState.segSelectedPath || segState.segDetections.length === 0) return;
+  await trySaveSegmentation(false);
+}
+
+// force=false: cek dulu ke server apakah hasil ini persis sama (jumlah sel
+// per kelas identik) dengan hasil TERAKHIR yang sudah tersimpan buat gambar
+// ini -- kalau iya, server belum nulis apa-apa & balikin needsConfirmation,
+// baru di sini ditanya ke user mau tetap disimpan sebagai duplikat atau
+// tidak (force=true buat beneran nulis). Ini nyegah folder numpuk banyak
+// file JSON isinya sama persis tanpa disadari user.
+async function trySaveSegmentation(force) {
   btnSaveSegmentation.disabled = true;
   btnSaveSegmentation.textContent = "Menyimpan...";
 
@@ -219,6 +229,7 @@ export async function doSaveSegmentation() {
       path: segState.segSelectedPath,
       patientId: segPatientNameInput.value.trim(),
       detections: segState.segDetections,
+      force,
     }),
   });
   const data = await res.json();
@@ -229,7 +240,19 @@ export async function doSaveSegmentation() {
     showToast(data.message || "Gagal menyimpan hasil.");
     return;
   }
+
+  if (data.needsConfirmation) {
+    const lanjut = await showConfirmModal(
+      `Hasil ini sama persis (jumlah sel per kelas identik) dengan hasil tersimpan ` +
+      `terakhir untuk gambar ini (${data.lastDetailFile}, ${data.lastTimestamp}).\n\n` +
+      `Simpan lagi sebagai duplikat?`
+    );
+    if (lanjut) await trySaveSegmentation(true);
+    return;
+  }
+
+  const dupNote = data.isDuplicate ? " (ditandai duplikat)" : "";
   showToast(
-    `Tersimpan (${data.totalCells} sel) -- lihat segmentation_log.csv di folder gambar sumber.`
+    `Tersimpan (${data.totalCells} sel)${dupNote} -- lihat segmentation_log.csv di folder gambar sumber.`
   );
 }

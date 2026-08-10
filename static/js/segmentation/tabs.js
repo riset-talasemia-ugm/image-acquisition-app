@@ -2,6 +2,7 @@ import {
   segTabSource, segTabResult, segSourceBody, segResultBody,
   segTabDetections, segTabFolderResults, segDetectionsHelp, segDetectionsBody,
   segResultsListHelp, segResultsFilter, segResultsListBody, segBulkActionsBar,
+  segClassTabTable, segClassTabChart, classSummaryBody, classChartBody,
 } from "../dom.js";
 import { segState } from "./state.js";
 
@@ -29,4 +30,15 @@ export function switchSegListTab(tab) {
   segResultsFilter.classList.toggle("view-hidden", isDetections);
   segResultsListBody.classList.toggle("view-hidden", isDetections);
   segBulkActionsBar.classList.toggle("view-hidden", !isDetections || segState.segDetections.length === 0);
+}
+
+// Tab kecil di panel Ringkasan klasifikasi (Tabel <-> Grafik) -- tabel tetap
+// jadi tampilan utama/default (persis kayak sebelumnya), grafik batang cuma
+// visualisasi tambahan yang lebih gampang dibaca sekilas.
+export function switchSegClassTab(tab) {
+  const isTable = tab === "table";
+  segClassTabTable.classList.toggle("seg-image-tab-active", isTable);
+  segClassTabChart.classList.toggle("seg-image-tab-active", !isTable);
+  classSummaryBody.classList.toggle("view-hidden", !isTable);
+  classChartBody.classList.toggle("view-hidden", isTable);
 }

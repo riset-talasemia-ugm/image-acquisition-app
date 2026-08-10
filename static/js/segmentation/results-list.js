@@ -89,10 +89,16 @@ export function renderSegResultsList(results) {
         r.detailFile && r.detailFile !== filename
           ? `<span class="seg-result-list-file" title="${r.detailFile}">${r.detailFile}</span>`
           : "";
+      // Hasil yang jumlah sel per kelasnya PERSIS SAMA dengan hasil
+      // sebelumnya (lihat check duplikat di trySaveSegmentation) ditandai
+      // di sini, biar kelihatan sekilas mana yang kemungkinan nggak perlu.
+      const dupTag = r.isDuplicate
+        ? ` <span class="seg-duplicate-tag" title="${r.duplicateOfFile ? "Sama dengan: " + r.duplicateOfFile : ""}">duplikat</span>`
+        : "";
       return `
         <div class="summary-row seg-result-list-row" data-path="${r.detailPath}">
           <div class="seg-result-list-main">
-            <span class="seg-result-list-title">${filename}${patientTag}</span>
+            <span class="seg-result-list-title">${filename}${patientTag}${dupTag}</span>
             ${fileSubtitle}
           </div>
           <span>${r.totalCells} sel</span>

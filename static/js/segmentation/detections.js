@@ -1,6 +1,6 @@
 import {
   segResultBody, segSourceBody, segZoomLabel, segDetectionsBody,
-  classSummaryBody, btnSegAddCell, btnSaveSegmentation,
+  classSummaryBody, classChartBody, btnSegAddCell, btnSaveSegmentation,
   segSelectAllCells, segBulkClassSelect, segTabDetections, segBulkActionsBar,
 } from "../dom.js";
 import { segState, SEG_LOW_CONFIDENCE_THRESHOLD } from "./state.js";
@@ -196,8 +196,8 @@ export function renderClassSummary(counts) {
       const count = counts ? counts[c.label] ?? 0 : null;
       const pct = counts && total > 0 ? (count / total) * 100 : 0;
       const pctText = counts ? pct.toFixed(1) + "%" : "";
-      // Baris & bar cuma bisa diklik kalau sudah ada hasil (counts != null) --
-      // klik toggle highlight kelas itu di overlay gambar (lihat toggleClassHighlight).
+      // Baris cuma bisa diklik kalau sudah ada hasil (counts != null) -- klik
+      // toggle highlight kelas itu di overlay gambar (lihat toggleClassHighlight).
       const clickable = counts ? " seg-class-clickable" : "";
       const active = counts && segState.segHighlightedClassIndex === c.index ? " seg-class-row-active" : "";
       return `
@@ -208,7 +208,6 @@ export function renderClassSummary(counts) {
             ${counts ? `<span class="seg-class-pct">(${pctText})</span>` : ""}
           </span>
         </div>
-        <div class="seg-class-bar-track${clickable}${active}" data-class-index="${c.index}"><div class="seg-class-bar-fill" style="width:${pct}%;background:${c.color}"></div></div>
       `;
     })
     .join("");
@@ -218,15 +217,100 @@ export function renderClassSummary(counts) {
       el.addEventListener("click", () => toggleClassHighlight(parseInt(el.dataset.classIndex, 10)));
     });
   }
+  renderClassChart(counts);
+}
+
+// Pembulatan "nice" buat jarak antar gridline sumbu Y (0/1/2/5x10^n) --
+// pola umum di library chart, biar angka di sumbu gampang dibaca (bukan
+// pecahan aneh kayak 0, 3.33, 6.67).
+function niceTickStep(maxValue, targetTicks = 5) {
+  if (maxValue <= 0) return 1;
+  const raw = maxValue / targetTicks;
+  const magnitude = Math.pow(10, Math.floor(Math.log10(raw)));
+  const norm = raw / magnitude;
+  let step;
+  if (norm < 1.5) step = 1;
+  else if (norm < 3) step = 2;
+  else if (norm < 7) step = 5;
+  else step = 10;
+  return step * magnitude;
+}
+
+// Grafik batang vertikal (SVG, tanpa library eksternal) buat ringkasan
+// klasifikasi per kelas -- pelengkap tampilan Tabel, biar sekali lihat
+// langsung kebaca kelas mana yang dominan.
+export function renderClassChart(counts) {
+  if (!counts) {
+    classChartBody.innerHTML =
+      '<span class="placeholder-text">Belum ada hasil untuk ditampilkan sebagai grafik.</span>';
+    return;
+  }
+
+  const chartW = 820;
+  const chartH = 340;
+  const marginLeft = 34;
+  const marginRight = 10;
+  const marginTop = 20;
+  const marginBottom = 96;
+  const plotW = chartW - marginLeft - marginRight;
+  const plotH = chartH - marginTop - marginBottom;
+
+  const n = segState.segClassLabels.length;
+  const maxCount = Math.max(1, ...segState.segClassLabels.map((c) => counts[c.label] ?? 0));
+  const tickStep = niceTickStep(maxCount);
+  const niceMax = Math.max(tickStep, Math.ceil(maxCount / tickStep) * tickStep);
+  const ticks = [];
+  for (let t = 0; t <= niceMax; t += tickStep) ticks.push(t);
+
+  const gridlines = ticks
+    .map((t) => {
+      const y = marginTop + plotH - (t / niceMax) * plotH;
+      return `
+        <line x1="${marginLeft}" y1="${y}" x2="${marginLeft + plotW}" y2="${y}" stroke="var(--slate-200)" stroke-width="1" />
+        <text x="${marginLeft - 6}" y="${y}" text-anchor="end" dominant-baseline="middle" font-size="11" fill="var(--slate-500)">${t}</text>
+      `;
+    })
+    .join("");
+
+  const barGap = 10;
+  const barW = (plotW - barGap * (n - 1)) / n;
+  const bars = segState.segClassLabels
+    .map((c, i) => {
+      const count = counts[c.label] ?? 0;
+      const barH = (count / niceMax) * plotH;
+      const x = marginLeft + i * (barW + barGap);
+      const y = marginTop + plotH - barH;
+      const labelX = x + barW / 2;
+      const dimmed =
+        segState.segHighlightedClassIndex !== null && segState.segHighlightedClassIndex !== c.index
+          ? ' opacity="0.35"'
+          : "";
+      const active = segState.segHighlightedClassIndex === c.index ? ' class="seg-class-bar-active"' : "";
+      return `
+        <g class="seg-class-chart-bar-group seg-class-clickable" data-class-index="${c.index}">
+          <rect x="${x}" y="${y}" width="${barW}" height="${Math.max(barH, 0)}" fill="${c.color}" rx="3"${dimmed}${active} />
+          <rect x="${x}" y="${marginTop}" width="${barW}" height="${plotH}" fill="transparent" />
+          ${count > 0 ? `<text x="${labelX}" y="${y - 4}" text-anchor="middle" font-size="11" font-weight="600" fill="var(--slate-800)">${count}</text>` : ""}
+          <text x="${labelX}" y="${marginTop + plotH + 14}" text-anchor="end" font-size="10" fill="var(--slate-500)" transform="rotate(-40 ${labelX} ${marginTop + plotH + 14})">${c.label}</text>
+        </g>
+      `;
+    })
+    .join("");
+
+  const axisLine = `<line x1="${marginLeft}" y1="${marginTop + plotH}" x2="${marginLeft + plotW}" y2="${marginTop + plotH}" stroke="var(--slate-400)" stroke-width="1.5" />`;
+
+  classChartBody.innerHTML = `<svg viewBox="0 0 ${chartW} ${chartH}" class="seg-class-chart-svg">${gridlines}${bars}${axisLine}</svg>`;
+
+  classChartBody.querySelectorAll(".seg-class-clickable").forEach((el) => {
+    el.addEventListener("click", () => toggleClassHighlight(parseInt(el.dataset.classIndex, 10)));
+  });
 }
 
 // Klik baris/bar kelas di ringkasan -> highlight (dim yang lain) sel kelas
 // itu di overlay Hasil Segmentasi. Klik lagi kelas yang sama -> matikan lagi.
 export function toggleClassHighlight(classIndex) {
   segState.segHighlightedClassIndex = segState.segHighlightedClassIndex === classIndex ? null : classIndex;
-  classSummaryBody.querySelectorAll("[data-class-index]").forEach((el) => {
-    el.classList.toggle("seg-class-row-active", parseInt(el.dataset.classIndex, 10) === segState.segHighlightedClassIndex);
-  });
+  updateClassSummaryFromDetections(); // render ulang tabel + grafik dgn state highlight terbaru
   applySegClassHighlightToOverlay();
 }
 

@@ -7,6 +7,7 @@ import {
   tabCapture, tabSegmentation,
   btnSegSelectImage, btnLoadSegmentation, btnRunSegmentation, btnSaveSegmentation,
   btnSendToSegmentation, segTabSource, segTabResult, segTabDetections, segTabFolderResults,
+  segClassTabTable, segClassTabChart,
   btnSegAddCell, btnSegZoomIn, btnSegZoomOut, btnSegZoomReset, segSourceBody, segResultBody,
   btnSegPatientSummary, btnSegBatchRun, btnSegListResults, btnSegExportReport,
   segResultsFilter, segSelectAllCells, btnSegBulkApply, btnSegSaveModelConfig,
@@ -21,7 +22,7 @@ import {
   doCapture, doSelectFolder, doSave, loadFolderSummary, updateSaveButtonState,
   sendCaptureToSegmentation,
 } from "./capture.js";
-import { switchSegImageTab, switchSegListTab } from "./segmentation/tabs.js";
+import { switchSegImageTab, switchSegListTab, switchSegClassTab } from "./segmentation/tabs.js";
 import {
   toggleSegAddMode, setSegZoom, resetSegZoom, handleSegWheelZoom, segMouseDown, segMouseMove,
   segMouseUp, loadClassLegend, toggleSegSelectAll, doSegBulkApply,
@@ -46,6 +47,8 @@ btnSendToSegmentation.addEventListener("click", sendCaptureToSegmentation);
 segTabSource.addEventListener("click", () => switchSegImageTab("source"));
 segTabResult.addEventListener("click", () => switchSegImageTab("result"));
 segTabDetections.addEventListener("click", () => switchSegListTab("detections"));
+segClassTabTable.addEventListener("click", () => switchSegClassTab("table"));
+segClassTabChart.addEventListener("click", () => switchSegClassTab("chart"));
 segTabFolderResults.addEventListener("click", doLoadSegResultsListButton);
 
 btnSegAddCell.addEventListener("click", toggleSegAddMode);

@@ -394,7 +394,8 @@ export function renderSegmentationOverlay() {
 // Dipanggil tiap kali segState.segDetections berubah -- biar jumlah sel di
 // samping tombol "Hasil Segmentasi" selalu konsisten sama daftar & overlay.
 export function updateSegTotalCellCount() {
-  segTotalCellCount.textContent = segState.segDetections.length > 0 ? `(${segState.segDetections.length} sel)` : "";
+  segTotalCellCount.textContent =
+    segState.segDetections.length > 0 ? `Jumlah sel terdeteksi: ${segState.segDetections.length} sel` : "";
 }
 
 export function renderDetectionsList() {

@@ -4,16 +4,17 @@ import {
   btnSaveSegmentation, segSelectAllCells, segDetectionsBody, segBulkActionsBar,
 } from "../dom.js";
 import { segState } from "./state.js";
-import { segFolderOf } from "./utils.js";
+import { segFolderOf, guessPatientIdFromFilename } from "./utils.js";
 import { switchSegImageTab } from "./tabs.js";
 import {
   renderSegmentationOverlay, renderDetectionsList, updateClassSummaryFromDetections,
-  renderClassSummary, resetSegZoom,
+  renderClassSummary, resetSegZoom, updateSegTotalCellCount,
 } from "./detections.js";
 import { showConfirmModal, showToast } from "../modal.js";
 
 export function resetSegmentationResults() {
   segState.segDetections = [];
+  updateSegTotalCellCount();
   segState.segHighlightedClassIndex = null;
   segState.segActiveCellId = null;
   segState.segAddMode = false;
@@ -47,6 +48,7 @@ export async function doSelectSegmentationImage() {
   segState.segCurrentImageDataUrl = `data:image/png;base64,${data.image}`;
   segImagePathEl.textContent = "Gambar: " + data.path;
   segSourceBody.innerHTML = `<img src="${segState.segCurrentImageDataUrl}" alt="${data.filename}" />`;
+  segPatientNameInput.value = guessPatientIdFromFilename(data.path || data.filename);
   btnRunSegmentation.disabled = false;
   resetSegmentationResults();
 }

@@ -33,6 +33,7 @@ export const btnSegZoomIn = document.getElementById("btnSegZoomIn");
 export const btnSegZoomOut = document.getElementById("btnSegZoomOut");
 export const btnSegZoomReset = document.getElementById("btnSegZoomReset");
 export const segZoomLabel = document.getElementById("segZoomLabel");
+export const segTotalCellCount = document.getElementById("segTotalCellCount");
 export const btnSegPatientSummary = document.getElementById("btnSegPatientSummary");
 export const segPatientSummaryBody = document.getElementById("segPatientSummaryBody");
 export const btnSegBatchRun = document.getElementById("btnSegBatchRun");

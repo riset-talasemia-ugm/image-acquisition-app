@@ -2,6 +2,7 @@ import {
   segResultBody, segSourceBody, segZoomLabel, segDetectionsBody,
   classSummaryBody, classChartBody, btnSegAddCell, btnSaveSegmentation,
   segSelectAllCells, segBulkClassSelect, segTabDetections, segBulkActionsBar,
+  segTotalCellCount,
 } from "../dom.js";
 import { segState, SEG_LOW_CONFIDENCE_THRESHOLD } from "./state.js";
 import { currentClassIndex } from "./utils.js";
@@ -382,7 +383,6 @@ export function renderSegmentationOverlay() {
   });
   segResultBody.innerHTML = `
     <div class="seg-overlay-wrap">
-      <div class="seg-total-badge">${segState.segDetections.length} sel terdeteksi</div>
       <img src="${segState.segCurrentImageDataUrl}" alt="hasil segmentasi" />
       <svg viewBox="0 0 ${segState.segImgW} ${segState.segImgH}" preserveAspectRatio="xMidYMid meet">${polygons}${labels}</svg>
     </div>
@@ -391,7 +391,14 @@ export function renderSegmentationOverlay() {
   applySegClassHighlightToOverlay();
 }
 
+// Dipanggil tiap kali segState.segDetections berubah -- biar jumlah sel di
+// samping tombol "Hasil Segmentasi" selalu konsisten sama daftar & overlay.
+export function updateSegTotalCellCount() {
+  segTotalCellCount.textContent = segState.segDetections.length > 0 ? `(${segState.segDetections.length} sel)` : "";
+}
+
 export function renderDetectionsList() {
+  updateSegTotalCellCount();
   const detectionsTabActive = segTabDetections.classList.contains("seg-image-tab-active");
   segBulkActionsBar.classList.toggle("view-hidden", segState.segDetections.length === 0 || !detectionsTabActive);
   if (segState.segDetections.length === 0) {

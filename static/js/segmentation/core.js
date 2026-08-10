@@ -8,12 +8,13 @@ import { segFolderOf } from "./utils.js";
 import { switchSegImageTab } from "./tabs.js";
 import {
   renderSegmentationOverlay, renderDetectionsList, updateClassSummaryFromDetections,
-  renderClassSummary, resetSegZoom,
+  renderClassSummary, resetSegZoom, updateSegTotalCellCount,
 } from "./detections.js";
 import { showConfirmModal, showToast } from "../modal.js";
 
 export function resetSegmentationResults() {
   segState.segDetections = [];
+  updateSegTotalCellCount();
   segState.segActiveCellId = null;
   segState.segAddMode = false;
   segState.segSelectedCellIds = new Set();

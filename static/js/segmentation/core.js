@@ -8,13 +8,13 @@ import { segFolderOf } from "./utils.js";
 import { switchSegImageTab } from "./tabs.js";
 import {
   renderSegmentationOverlay, renderDetectionsList, updateClassSummaryFromDetections,
-  renderClassSummary, resetSegZoom, updateSegTotalCellCount,
+  renderClassSummary, resetSegZoom,
 } from "./detections.js";
 import { showConfirmModal, showToast } from "../modal.js";
 
 export function resetSegmentationResults() {
   segState.segDetections = [];
-  updateSegTotalCellCount();
+  segState.segHighlightedClassIndex = null;
   segState.segActiveCellId = null;
   segState.segAddMode = false;
   segState.segSelectedCellIds = new Set();
@@ -70,6 +70,7 @@ export function applyLoadedSegmentationResult(data) {
   }));
   segState.segActiveCellId = null;
   segState.segAddMode = false;
+  segState.segHighlightedClassIndex = null;
   segState.segSelectedCellIds = new Set();
   segSelectAllCells.checked = false;
   btnSegAddCell.classList.remove("btn-toggle-active");
@@ -192,6 +193,7 @@ export async function doRunSegmentation() {
   }));
   segState.segActiveCellId = null;
   segState.segAddMode = false;
+  segState.segHighlightedClassIndex = null;
   segState.segSelectedCellIds = new Set();
   segSelectAllCells.checked = false;
   btnSegAddCell.classList.remove("btn-toggle-active");

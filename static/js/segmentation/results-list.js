@@ -82,9 +82,19 @@ export function renderSegResultsList(results) {
     .map((r) => {
       const filename = r.sourceImage ? r.sourceImage.split(/[\\/]/).pop() : r.detailFile;
       const patientTag = r.patientId && r.patientId !== "?" ? ` (${r.patientId})` : "";
+      // Baris kedua nunjukin nama file JSON detail aslinya (persis kayak di
+      // File Explorer/folder gambar) -- biar jelas file mana persisnya yang
+      // dipakai buat gambar ini, nggak cuma nama gambar sumbernya.
+      const fileSubtitle =
+        r.detailFile && r.detailFile !== filename
+          ? `<span class="seg-result-list-file" title="${r.detailFile}">${r.detailFile}</span>`
+          : "";
       return `
         <div class="summary-row seg-result-list-row" data-path="${r.detailPath}">
-          <span>${filename}${patientTag}</span>
+          <div class="seg-result-list-main">
+            <span class="seg-result-list-title">${filename}${patientTag}</span>
+            ${fileSubtitle}
+          </div>
           <span>${r.totalCells} sel</span>
         </div>
       `;

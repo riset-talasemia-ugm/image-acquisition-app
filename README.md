@@ -1,3 +1,5 @@
+> **Panduan pengguna:** [versi Markdown](docs/panduan-aplikasi.md) · [versi PDF](docs/panduan-aplikasi.pdf)
+
 # Aplikasi Akuisisi Citra Apusan Darah Tepi (ADT)
 
 Aplikasi web lokal untuk akuisisi citra apusan darah tepi dari kamera mikroskop USB.

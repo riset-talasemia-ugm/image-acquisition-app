@@ -7,9 +7,11 @@ Ada dua lapis pengujian:
 ## 1. Lingkungan dan lokasi file
 
 - Tes ditulis dengan `unittest` bawaan Python dan `app.test_client()` Flask, tanpa dependency baru.
-- Jalankan dengan: `python -m unittest discover -s tests -v`
+- File tes: `tests/test_v010.py`. Jalankan dengan: `python -m unittest discover -s tests -v` (~3 detik).
+- Nilai acuan v0.1.0 ada di `tests/expected_v0.1.0.json`, direkam sekali di tag `v0.1.0` dengan `RECORD_EXPECTED=1`. Selama refactor file ini **tidak boleh direkam ulang**. Kalau ada tes yang gagal, yang diperbaiki kodenya, bukan acuannya.
+- Sebelum dibandingkan, path folder uji dan timestamp di respons API diganti placeholder (`<DIR>`, `<TS>`).
 - **Semua keluaran tes ditulis ke `tmp/test-run/`** di root proyek, bukan ke folder temp sistem di drive C. Tiap tes membuat subfolder sendiri lalu menghapusnya sesudah selesai.
-- Fixture kecil buatan sendiri (gambar sintetis, CSV/JSON contoh) disimpan di `tests/fixtures/` dan ikut di-commit.
+- Gambar uji dibuat sintetis dan deterministik di dalam tes, jadi tidak ada file fixture biner.
 - **Gambar pasien asli tidak di-commit.** Simpan di `tmp/data-uji/`. Tes yang memakainya otomatis di-skip kalau folder itu tidak ada.
 
 ## 2. Tes otomatis
@@ -18,17 +20,17 @@ Ditulis di Fase 0, terhadap v0.1.0. Tes ini **tidak boleh diubah** selama refact
 
 | No | Tes | Yang dicek | Kontrak |
 |---|---|---|---|
-| 2.1 | Snapshot route | Daftar `(rule, methods)` dari `app.url_map` sama dengan `tests/route_snapshot.txt` | 01 §4.1 |
+| 2.1 | Snapshot route | Daftar `(rule, methods)` dari `app.url_map` sama dengan acuan | 01 §4.1 |
 | 2.2 | Helper murni | `safe_slug`, `next_iteration_from_folder` (folder kosong, lanjut nomor, slug beda), `resize_for_save`, `is_blank_frame` (frame hitam vs berisi) | F-CAP-1, F-CAP-6 |
 | 2.3 | Migrasi CSV | `_ensure_log_columns` pada CSV kolom lama: baris lama tetap ada, kolom baru kosong, urutan header sesuai 01 §4.2 | 01 §4.2 |
 | 2.4 | Simpan dan muat segmentasi | `random.seed` tetap, lalu `POST run`, `POST save` ke `tmp/test-run/`. Isi JSON detail dan baris CSV sesuai format. `load-path` mengembalikan deteksi yang sama. Save kedua tanpa perubahan memberi tanda duplikat | F-SEG-2, F-SEG-5, F-SEG-6 |
-| 2.5 | Instance tunggal | Objek kamera, tracker fokus, dan kedua lock yang di-import dari modul berbeda punya `id()` yang sama (relevan mulai Fase 1) | NF-4 |
+| 2.5 | Instance tunggal | Objek kamera, tracker fokus, dan kedua lock yang di-import dari modul berbeda punya `id()` yang sama. **Ditambahkan di Fase 1**, karena di v0.1.0 semuanya masih satu modul | NF-4 |
 | 2.6 | Fokus deterministik | `analyze_focus` pada gambar fixture menghasilkan angka sama dengan nilai yang direkam di v0.1.0 (toleransi 1e-6) | F-CAP-2 |
 | 2.7 | Export | `export-report` menghasilkan xlsx yang bisa dibuka openpyxl dengan header yang benar. `export-coco` menghasilkan `images`/`annotations`/`categories` dengan 13 kategori sesuai urutan `RBC_CLASS_LABELS` | F-SEG-9 |
 | 2.8 | Ringkasan | `folder-summary` dan `patient-summary` pada folder fixture memberi jumlah per pasien dan per kelas yang benar | F-CAP-8, F-SEG-8 |
 | 2.9 | Data lama (opsional) | Bila `tmp/data-uji/` ada: `list-results` dan `patient-summary` pada data akuisisi asli tidak error, dan hasilnya sama dengan v0.1.0 | 01 §4.2 |
 
-Cara merekam nilai acuan v0.1.0 (tes 2.6, 2.9): jalankan skrip perekam sekali di tag `v0.1.0`, lalu simpan hasilnya ke `tests/fixtures/expected_*.json`. Nilai ini di-commit dan tidak diubah.
+Acuan tes 2.9 berasal dari data pasien, jadi disimpan di `tmp/data-uji/expected.json` dan tidak di-commit. Rekam acuan ini dengan `RECORD_EXPECTED=1` sambil checkout `v0.1.0`, sebelum kode refactor menyentuh folder itu.
 
 Yang tidak diuji otomatis: `CameraManager` dengan hardware, `/stream`, dialog tkinter (`select-folder`, `select-image`, `load`, `batch-select`), dan CLIP (model 600 MB).
 

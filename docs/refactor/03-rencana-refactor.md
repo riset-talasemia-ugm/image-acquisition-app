@@ -25,7 +25,7 @@ Refactor dianggap selesai kalau:
 2. Tag `v0.1.0` di `main`: `git tag -a v0.1.0 -m "Baseline sebelum refactor"`.
 3. Siapkan data uji di `tmp/data-uji/`: beberapa gambar capture asli, `capture_log.csv` format lama dan baru, JSON detail, dan `segmentation_log.csv`.
 4. Tulis tes karakterisasi (lihat `04-rencana-uji.md`, bagian 2) di atas v0.1.0, lalu pastikan lulus. **Tes ini wajib ada sebelum Fase 1.**
-5. Rekam snapshot daftar route (`app.url_map`) ke `tests/route_snapshot.txt`.
+5. Rekam acuan (`RECORD_EXPECTED=1`) ke `tests/expected_v0.1.0.json`, termasuk snapshot daftar route. Status: tes dan acuan sudah dibuat. Yang tersisa hanya data uji asli di langkah 3.
 
 ### Fase 1: Backend
 Urutannya dari bagian yang paling sedikit bergantung ke yang paling banyak. Setelah tiap langkah: jalankan tes, lalu commit.

@@ -79,7 +79,46 @@ Lalu buka `http://127.0.0.1:5000` di browser.
 5. Kalau belum pas, klik Capture lagi buat mengambil ulang.
 6. Klik **Lokasi Simpan** untuk memilih folder tujuan (dialog folder native akan muncul). Panel **Ringkasan Folder** otomatis muncul dan menampilkan jumlah gambar per pasien di folder tersebut.
 7. Klik **Save**. File tersimpan dengan format `id-pasien_YYYYMMDD-HHMMSS_NN.png`, dan Ringkasan Folder ikut ter-update otomatis. Metadata capture (timestamp, id pasien, filename, iterasi, kamera, resolusi, skor fokus) juga dicatat ke `capture_log.csv` di folder yang sama.
-8. Gambar yang berhasil disimpan pada sesi ini juga muncul di galeri riwayat di bagian bawah halaman.
+8. Gambar yang berhasil disimpan pada sesi ini juga muncul di galeri riwayat di bagian bawah halaman. **Klik thumbnail untuk preview** gambar besar dengan ringkasan badge kualitas saat disimpan (fokus, pinggir, CLIP). Di dalam preview: klik gambar untuk zoom 100% (berguna memeriksa pojok/pinggir), tombol **Sebelumnya/Berikutnya** atau panah kiri/kanan untuk pindah gambar, **Esc** atau klik area gelap untuk menutup. Selama preview terbuka, Spasi dan Enter tidak memicu Capture/Save. Yang dipreview adalah hasil capture dalam resolusi asli kamera, bukan versi yang diperkecil oleh pilihan resolusi saat Save.
+
+## Kualitas fokus seluruh frame
+
+Di bawah panel Stream ada kartu **Kualitas Fokus (seluruh frame)**. Dokter menganotasi citra penuh, jadi yang dinilai seluruh frame termasuk pinggir, bukan hanya tengah. Metodenya Tenengrad per tile (grid 8x6) yang hasilnya dibandingkan dengan **puncak tile itu sendiri**, karena nilai mentahnya sangat bergantung pada isi gambar (sel padat vs jarang) dan tidak bisa dibandingkan antar lapang pandang. Variance Laplacian (skor lama) tetap dicatat tetapi tidak dipakai untuk menilai, karena sebagian besarnya adalah noise sensor.
+
+**Cara pakai di mikroskop**
+1. Letakkan lapang pandang yang akan diambil.
+2. Putar fokus **sedikit melewati titik paling tajam, lalu kembali**. Kartu menampilkan "Puncak fokus belum terkonfirmasi" sampai hal ini dilakukan, karena tanpa pembanding tiap frame otomatis jadi puncak baru.
+3. Setelah puncak terkonfirmasi, kartu menampilkan status **Baik / Sedang / Buram** dan persen dari puncak. Peta tile: hijau = dekat puncak tile itu, merah = jauh. Tile pinggir yang puncaknya di posisi fokus berbeda (lengkung bidang) tidak dihukum oleh tile tengah.
+4. Klik **Capture**. Badge "Fokus ..." di panel Hasil Capture memakai penilaian ini. Kalau statusnya Buram, **Save** meminta konfirmasi dulu (peringatan, bukan pemblokiran).
+
+**Peringatan pinggir lemah.** Status di atas hanya menilai setelan fokus (dekat puncak tiap tile), jadi pinggir yang buram bawaan, misalnya karena preparat atau kamera miring, tidak menurunkannya. Sebagai petunjuk tambahan, kartu dan badge "Pinggir lemah" muncul kalau rasio Tenengrad **tepi/tengah** di bawah `FOCUS_EDGE_RATIO_WARN = 0.65`. Peringatan ini satu-frame (tidak perlu puncak terkonfirmasi) dan **tidak mengubah status**. Ambang 0,65 adalah persentil ke-25 rasio di 80 gambar data 27-08 (menandai sekitar 29% gambar); heuristik, karena sel yang lebih jarang di pinggir juga menurunkan rasio tanpa ada blur. Rasio dan flag-nya dicatat di log (`edge_ratio`, `edge_warn`).
+
+**Perhatikan**
+- Referensi puncak **direset otomatis** kalau lapang pandang berganti (citra kasar tidak lagi cocok dengan referensi). Tombol **Reset puncak** untuk reset manual.
+- Ambang status (`FOCUS_REL_GOOD = 0.85`, `FOCUS_REL_WARN = 0.65` di `app.py`) **masih heuristik**, belum dikalibrasi dengan label dokter. Yang dicatat ke log adalah nilai mentahnya, supaya ambang bisa dikalibrasi setelah ada penilaian dokter.
+- Tile tanpa sel (latar kosong) tidak dihitung. Ambangnya (`FOCUS_TILE_MIN_STD`) berupa perkiraan, karena pada data 27-08 hampir semua tile berisi sel.
+- Kartu bisa dimatikan dengan mencentang/mengosongkan **Live** (menghemat CPU; analisis tetap berjalan saat Capture).
+- Satu analisis frame 5 MP sekitar 0,1 detik di laptop; di Jetson belum diukur. Kartu memoll tiap ~0,7 detik.
+
+**Kolom tambahan di `capture_log.csv`** (file lama otomatis dimigrasi, baris lama dikosongkan): `tile_median`, `tile_low` (persentil ke-25 tile), `tile_center`, `tile_edge`, `tile_valid_frac`, `rel_low`, `rel_median`, `focus_status`, `tile_map_json` (nilai 6x8 tile), dan `clip_*`. Kolom `focus_score` tetap variance Laplacian lama.
+
+### Skor semantik CLIP (opsional, eksperimen)
+
+Nonaktif secara default. Menghitung skor kepadatan sel (`clip_kepadatan`, `clip_gabungan_v2`, `clip_norm`) dengan 12 crop yang tersebar di seluruh frame, **hanya saat Capture**. Skornya belum divalidasi dengan label dokter: ditampilkan sebagai badge dan dicatat ke log, bukan dipakai sebagai gerbang. Dari eksperimen, sinyalnya terutama kepadatan sel.
+
+```
+# Pasang PyTorch sesuai platform dulu (lihat requirements-clip.txt), lalu:
+pip install -r requirements-clip.txt
+
+# Windows: double-click run-clip.bat (sama seperti run.bat, dengan CLIP aktif)
+# Windows (cmd):   set CLIP_QUALITY=1 && python app.py
+# Linux/Jetson:    CLIP_QUALITY=1 python app.py
+```
+
+Di laptop pengembangan, venv aplikasi sudah berisi PyTorch versi CPU dan `open_clip_torch` (cukup, sekitar 1 detik per Capture). `run.bat` biasa tetap menjalankan aplikasi tanpa CLIP.
+
+- Bobot model (~600 MB) diunduh dari Hugging Face saat pertama dipakai. **Jalankan sekali dengan internet sebelum ke lab**, setelah itu tersimpan di cache. Model dimuat di latar belakang setelah kamera terhubung; kartu fokus menampilkan status pemuatannya.
+- Model bisa diganti lewat `CLIP_MODEL` dan `CLIP_PRETRAINED`. Default `ViT-B-32` / `openai` sama dengan yang diuji di eksperimen. Open_clip memperingatkan mismatch QuickGELU untuk kombinasi ini; `ViT-B-32-quickgelu` belum diuji.
 
 ## Struktur folder
 

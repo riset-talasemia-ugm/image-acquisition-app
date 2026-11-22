@@ -548,3 +548,96 @@ body {
    di-zoom, jadi nggak perlu scrollbar. */
 .panel-body img,
 .seg-overlay-wrap { transition: transform 0.05s linear; }
+
+
+/* ---------------------------------------------------------------------------
+   Kartu Kualitas Fokus (seluruh frame): peta tile + status relatif terhadap
+   puncak. Lihat FocusTracker di app.py.
+   --------------------------------------------------------------------------- */
+.focus-card {
+  background: var(--white);
+  border: 1px solid var(--slate-200);
+  border-radius: 14px;
+  padding: 14px 20px 16px;
+  margin-top: 20px;
+}
+.focus-card-hidden { display: none; }
+.focus-card-head { display: flex; justify-content: space-between; align-items: center; }
+.focus-card-actions { display: flex; align-items: center; gap: 12px; }
+.focus-toggle { font-size: 12px; color: var(--slate-500); display: flex; align-items: center; gap: 4px; cursor: pointer; }
+.btn-small { padding: 5px 10px; font-size: 12px; }
+
+.focus-card-body { display: flex; gap: 24px; margin-top: 12px; align-items: flex-start; }
+.focus-map {
+  flex: 0 0 240px;
+  height: 180px;
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 2px;
+  background: var(--slate-100);
+  border-radius: 8px;
+  padding: 2px;
+}
+.focus-cell { border-radius: 3px; background: var(--slate-300); }
+.focus-cell-neutral { background: var(--slate-300); opacity: 0.6; }
+.focus-cell-empty { background: repeating-linear-gradient(45deg, var(--slate-200), var(--slate-200) 3px, var(--slate-100) 3px, var(--slate-100) 6px); }
+
+.focus-stats { flex: 1; min-width: 0; }
+.focus-status { font-size: 16px; font-weight: 700; }
+.focus-status-good { color: #166534; }
+.focus-status-mid { color: #92400e; }
+.focus-status-bad { color: #991b1b; }
+.focus-status-neutral { color: var(--slate-500); }
+.focus-bar { height: 8px; background: var(--slate-100); border-radius: 4px; margin: 8px 0; overflow: hidden; }
+.focus-bar-fill { height: 100%; width: 0; background: var(--slate-400); border-radius: 4px; transition: width 0.25s ease, background 0.25s ease; }
+.focus-detail { font-size: 12px; color: var(--slate-800); }
+.focus-hint { font-size: 12px; color: var(--slate-500); margin-top: 4px; min-height: 16px; }
+
+.badge-focus-mid { background: #fef3c7; color: #92400e; display: inline-block; }
+.badge-focus-neutral { background: var(--slate-100); color: var(--slate-500); display: inline-block; }
+.badge-semantic { background: var(--blue-50); color: var(--blue-700); display: inline-block; }
+
+.focus-warn { font-size: 12px; color: #92400e; background: #fef3c7; border-radius: 6px; padding: 6px 10px; margin-top: 8px; line-height: 1.4; }
+.focus-warn-hidden { display: none; }
+
+/* ---------------------------------------------------------------------------
+   Preview gambar dari "Riwayat tersimpan sesi ini": klik thumbnail untuk
+   membuka, klik gambar untuk zoom 100% (cek detail pinggir/pojok).
+   --------------------------------------------------------------------------- */
+.gallery-item { cursor: pointer; }
+.gallery-item:hover img, .gallery-item:focus-visible img { border-color: var(--blue-600); }
+.gallery-item:focus-visible { outline: none; }
+
+.image-preview { background: rgba(15, 23, 42, 0.72); }
+.image-preview-box {
+  background: var(--white);
+  border-radius: 12px;
+  width: min(88vw, 880px);
+  height: min(76vh, 620px);
+  display: flex;
+  flex-direction: column;
+  padding: 12px 16px;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.35);
+}
+.image-preview-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.image-preview-title { font-size: 13px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.image-preview-body {
+  flex: 1;
+  min-height: 0;
+  margin: 10px 0;
+  background: var(--slate-50);
+  border-radius: 8px;
+  overflow: auto;
+  display: flex;
+}
+.image-preview-body img {
+  margin: auto;
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 0;
+  cursor: zoom-in;
+}
+.image-preview-body img.image-preview-zoomed { max-width: none; max-height: none; cursor: zoom-out; }
+.image-preview-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.image-preview-info { font-size: 12px; color: var(--slate-500); text-align: center; flex: 1; }
+.image-preview-foot .btn:disabled { opacity: 0.4; cursor: default; }

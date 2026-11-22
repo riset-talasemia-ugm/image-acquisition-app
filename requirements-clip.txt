@@ -1,0 +1,9 @@
+# OPSIONAL: skor semantik CLIP (kepadatan sel). Fitur fokus TIDAK butuh ini.
+# Aktifkan dengan environment variable CLIP_QUALITY=1 (lihat README).
+#
+# Pasang PyTorch sesuai platform DULU, baru paket ini:
+#   Windows/Linux x86: https://pytorch.org/get-started/locally/
+#   Jetson: wheel PyTorch resmi NVIDIA yang cocok dengan versi JetPack
+# Bobot model (~600 MB) diunduh dari Hugging Face saat pertama kali dipakai:
+# jalankan sekali dengan internet, setelah itu tersimpan di cache dan bisa offline.
+open_clip_torch

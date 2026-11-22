@@ -25,11 +25,88 @@ from flask import Flask, Response, jsonify, render_template, request
 
 app = Flask(__name__)
 
-# Untuk deteksi buram
-FOCUS_BLUR_THRESHOLD = 60.0
+# Untuk deteksi buram (variance of Laplacian; skor ~6 = fokus baik pada kamera mikroskop saat ini)
+FOCUS_BLUR_THRESHOLD = 5.0
 
 # untuk deteksi objek tidak ada
 BLANK_STD_THRESHOLD = 5.0
+
+# ---------------------------------------------------------------------------
+# Kualitas fokus per tile di SELURUH frame
+# ---------------------------------------------------------------------------
+# Keputusan sementara dari eksperimen CLIP (lihat ringkasan-eksperimen-clip.md
+# di folder induk): fokus dinilai dengan Tenengrad per tile di seluruh frame
+# (dokter menganotasi citra penuh, jadi pinggir frame juga harus tajam) --
+# BUKAN variance Laplacian (dominan noise sensor) dan bukan CLIP.
+#
+# Nilai Tenengrad per tile sangat bergantung pada isi tile (sel padat vs
+# jarang), jadi nilai mentah TIDAK dibandingkan antar lapang pandang. Yang
+# dipakai adalah nilai RELATIF terhadap puncak tiap tile selama fokus diputar
+# di lapang pandang yang sama (peak-hold per tile, lihat FocusTracker).
+FOCUS_TILE_COLS = 8
+FOCUS_TILE_ROWS = 6
+# Tile dengan std abu-abu di bawah ini dianggap latar kosong dan tidak dihitung.
+# Angka ini perkiraan dari noise sensor (~0,5) + gradien iluminasi; pada data
+# 27-08 hampir semua tile berisi sel (std >= 4) sehingga belum bisa
+# dikalibrasi dari data.
+FOCUS_TILE_MIN_STD = 3.0
+FOCUS_LOW_PERCENTILE = 25
+# Puncak baru dianggap TERKONFIRMASI kalau setelah puncak itu median Tenengrad
+# pernah turun sampai <= FOCUS_PEAK_DROP x puncak (operator sudah memutar fokus
+# melewati titik tajam). Tanpa ini, saat fokus diputar menuju tajam tiap frame
+# menjadi puncak baru sehingga selalu "100% dari puncak" padahal belum tajam.
+# Kenaikan di bawah FOCUS_PEAK_TOL dianggap noise, bukan puncak baru.
+FOCUS_PEAK_DROP = 0.90
+FOCUS_PEAK_TOL = 0.02
+# Kalau korelasi citra kasar (64x48) dengan citra referensi turun di bawah ini,
+# dianggap pindah lapang pandang -> puncak di-reset otomatis.
+FOCUS_FIELD_CHANGE_NCC = 0.5
+# Ambang status (relatif terhadap puncak tile, persentil ke-25 semua tile).
+# MASIH HEURISTIK, belum dikalibrasi dengan label dokter: nilai mentahnya
+# dicatat di capture_log.csv untuk kalibrasi nanti.
+FOCUS_REL_GOOD = 0.85
+FOCUS_REL_WARN = 0.65
+# Peringatan (petunjuk saja, TIDAK mengubah status): Tenengrad rata-rata tile
+# pinggir dibagi tile dalam. Status di atas hanya menilai setelan fokus
+# (dekat puncak tile masing-masing), jadi pinggir yang buram bawaan (mis.
+# kemiringan preparat/kamera) tidak terlihat olehnya; rasio ini satu-satunya
+# sinyal satu-frame untuk itu. 0,65 = persentil ke-25 rasio di 80 gambar data
+# 27-08 (menandai ~29% gambar; gambar pasien-1 yang pinggirnya terlihat buram
+# bernilai 0,646). Masih heuristik: sel yang lebih jarang di pinggir juga
+# menurunkan rasio tanpa ada blur.
+FOCUS_EDGE_RATIO_WARN = 0.65
+
+# ---------------------------------------------------------------------------
+# Skor semantik CLIP (opsional, eksperimen)
+# ---------------------------------------------------------------------------
+# Nonaktif kecuali environment variable CLIP_QUALITY=1 dan paket torch +
+# open_clip_torch terpasang (lihat requirements-clip.txt). Hanya dihitung saat
+# Capture, tidak per frame. Skor ini BELUM divalidasi dengan label dokter:
+# ditampilkan dan dicatat ke log, bukan dipakai sebagai gerbang.
+CLIP_ENABLED = os.environ.get("CLIP_QUALITY", "0").strip() == "1"
+CLIP_MODEL_NAME = os.environ.get("CLIP_MODEL", "ViT-B-32")
+CLIP_PRETRAINED = os.environ.get("CLIP_PRETRAINED", "openai")
+# Crop 448 px pada frame selebar 2592 px (skala yang diuji di eksperimen),
+# diletakkan di grid yang membentang ke SELURUH frame (termasuk tepi).
+CLIP_CROP_FRAC = 448 / 2592
+CLIP_GRID_COLS = 4
+CLIP_GRID_ROWS = 3
+_CLIP_DENSITY_PAIR = (
+    "a microscope image densely covered with red blood cells",
+    "a microscope image of a blood smear with a large empty background",
+)
+# "gabungan_v2": semantik murni, tanpa negasi dan tanpa aspek fokus.
+_CLIP_POS_V2 = [
+    "a microscopic image of a well-spread blood smear with evenly distributed red blood cells",
+    "a high quality peripheral blood smear image with uniform cell distribution and well separated cells",
+    "a clear microscopy image of blood cells in monolayer with minimal empty space",
+    "a blood smear image with homogeneous red blood cell arrangement",
+]
+_CLIP_NEG_V2 = [
+    "a blood smear image with heavily overlapping and clumped red blood cells",
+    "a blood smear image with large empty background area and sparse cells",
+    "a blood smear image with dust, scratches, or air bubble artifacts",
+]
 
 # Berapa kali read() OpenCV boleh gagal berturut-turut sebelum dianggap
 OPENCV_DISCONNECT_THRESHOLD = 15
@@ -202,6 +279,9 @@ class CameraManager:
         self.last_frame = None       # frame terakhir dari stream (untuk MJPEG)
         self.captured_frame = None   # frame yang dibekukan lewat tombol Capture
         self.captured_focus_score = None
+        self.captured_quality = None    # hasil analyze_focus() untuk captured_frame (diisi api_capture)
+        self.captured_semantic = None   # hasil ClipQuality.score() untuk captured_frame, kalau aktif
+        self.capture_seq = 0            # nomor capture; hasil CLIP yang terlambat dibuang kalau sudah ada capture baru
         self._registry = []          # hasil list_cameras() terakhir, index -> {backend, ...}
 
         # State khusus backend ToupCam
@@ -476,7 +556,10 @@ class CameraManager:
             if self.last_frame is None:
                 return None
             self.captured_frame = self.last_frame.copy()
+            self.capture_seq += 1
             self.captured_focus_score = compute_focus_score(self.captured_frame)
+            self.captured_quality = None
+            self.captured_semantic = None
             return self.captured_frame
 
     def is_connected(self):
@@ -561,6 +644,270 @@ def compute_focus_score(frame):
     return float(cv2.Laplacian(gray, cv2.CV_64F).var())
 
 
+def compute_focus_tiles(frame):
+    """Tenengrad per tile di seluruh frame.
+
+    Gradien dihitung sekali di frame penuh (setelah Gaussian 5x5) lalu
+    dirata-rata per tile lewat resize INTER_AREA, jadi tidak ada artefak di
+    batas tile. Mengembalikan (teng, valid, small): matriks (ROWS, COLS) nilai
+    Tenengrad, mask tile yang berisi sel (bukan latar kosong), dan citra abu-abu
+    kasar 64x48 untuk mendeteksi pindah lapang pandang.
+    """
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY).astype(np.float32)
+    blurred = cv2.GaussianBlur(gray, (5, 5), 1.0)
+    grad = (
+        cv2.Sobel(blurred, cv2.CV_32F, 1, 0, ksize=3) ** 2
+        + cv2.Sobel(blurred, cv2.CV_32F, 0, 1, ksize=3) ** 2
+    )
+    size = (FOCUS_TILE_COLS, FOCUS_TILE_ROWS)
+    teng = cv2.resize(grad, size, interpolation=cv2.INTER_AREA)
+    mean = cv2.resize(gray, size, interpolation=cv2.INTER_AREA)
+    mean_sq = cv2.resize(gray * gray, size, interpolation=cv2.INTER_AREA)
+    std = np.sqrt(np.maximum(mean_sq - mean * mean, 0.0))
+    small = cv2.resize(gray, (64, 48), interpolation=cv2.INTER_AREA)
+    return teng, std >= FOCUS_TILE_MIN_STD, small
+
+
+def _ncc(a, b):
+    """Normalized cross-correlation dua citra kasar (1 = identik)."""
+    a = a - a.mean()
+    b = b - b.mean()
+    denom = math.sqrt(float((a * a).sum() * (b * b).sum()))
+    return float((a * b).sum() / denom) if denom > 1e-6 else 1.0
+
+
+class FocusTracker:
+    """Peak-hold Tenengrad per tile untuk lapang pandang yang sedang diamati.
+
+    Selama operator memutar fokus, tiap tile mengingat nilai tertingginya; skor
+    relatif = nilai sekarang / puncak tile itu. Karena tile yang sama
+    dibandingkan dengan dirinya sendiri, pengaruh isi gambar (padat/jarang)
+    hilang, dan tile pinggir yang puncaknya di posisi fokus berbeda (lengkung
+    bidang) tidak dihukum oleh tile tengah.
+
+    Otomatis reset kalau lapang pandang berganti (citra kasar tidak lagi
+    berkorelasi dengan referensi).
+    """
+
+    def __init__(self):
+        self.lock = threading.Lock()
+        self._reset_locked()
+
+    def _reset_locked(self):
+        self.peak = None
+        self.ref_small = None
+        self.med_peak = None      # median Tenengrad tertinggi yang teramati
+        self.dropped = False      # sudah turun >= FOCUS_PEAK_DROP setelah puncak itu?
+
+    def reset(self):
+        with self.lock:
+            self._reset_locked()
+
+    def update(self, teng, valid, small):
+        """Return (usable, rel, confirmed, changed)."""
+        with self.lock:
+            changed = False
+            if self.ref_small is not None and _ncc(self.ref_small, small) < FOCUS_FIELD_CHANGE_NCC:
+                self._reset_locked()
+                changed = True
+            if self.ref_small is None:
+                self.ref_small = small
+
+            current = np.where(valid, teng, 0.0)
+            self.peak = current.copy() if self.peak is None else np.maximum(self.peak, current)
+
+            if valid.any():
+                med = float(np.median(teng[valid]))
+                if self.med_peak is None or med > self.med_peak * (1.0 + FOCUS_PEAK_TOL):
+                    self.med_peak = med          # puncak baru -> konfirmasi diulang
+                    self.dropped = False
+                else:
+                    self.med_peak = max(self.med_peak, med)   # naik tipis = noise
+                    if med <= self.med_peak * FOCUS_PEAK_DROP:
+                        self.dropped = True
+            confirmed = bool(self.dropped)
+
+            usable = valid & (self.peak > 0)
+            rel = np.zeros(teng.shape, dtype=np.float32)
+            rel[usable] = np.minimum(teng[usable] / self.peak[usable], 1.0)
+            return usable, rel, confirmed, changed
+
+
+focus_tracker = FocusTracker()
+
+
+def focus_status(rel_low, confirmed):
+    """'baik' / 'sedang' / 'buram', atau None kalau puncak belum terkonfirmasi."""
+    if not confirmed or rel_low is None:
+        return None
+    if rel_low >= FOCUS_REL_GOOD:
+        return "baik"
+    if rel_low >= FOCUS_REL_WARN:
+        return "sedang"
+    return "buram"
+
+
+def analyze_focus(frame):
+    """Analisis fokus seluruh frame + update peak-hold. Hasilnya dict siap-JSON."""
+    teng, valid, small = compute_focus_tiles(frame)
+    rows, cols = teng.shape
+    result = {"valid": bool(valid.any()), "rows": rows, "cols": cols}
+    if not valid.any():
+        return result
+
+    ring = np.zeros(teng.shape, dtype=bool)
+    ring[0, :] = ring[-1, :] = True
+    ring[:, 0] = ring[:, -1] = True
+    inner, outer = valid & ~ring, valid & ring
+    center = float(teng[inner].mean()) if inner.any() else None
+    edge = float(teng[outer].mean()) if outer.any() else None
+
+    usable, rel, confirmed, changed = focus_tracker.update(teng, valid, small)
+    rel_vals = rel[usable]
+    rel_low = float(np.percentile(rel_vals, FOCUS_LOW_PERCENTILE)) if rel_vals.size else None
+    rel_median = float(np.median(rel_vals)) if rel_vals.size else None
+
+    vals = teng[valid]
+    edge_ratio = (edge / center) if (center and edge is not None) else None
+    result.update({
+        "median": float(np.median(vals)),
+        "low": float(np.percentile(vals, FOCUS_LOW_PERCENTILE)),
+        "center": center,
+        "edge": edge,
+        "edgeRatio": edge_ratio,
+        "edgeWarn": bool(edge_ratio is not None and edge_ratio < FOCUS_EDGE_RATIO_WARN),
+        "validFrac": float(valid.mean()),
+        "relLow": rel_low,
+        "relMedian": rel_median,
+        "confirmed": confirmed,
+        "changed": changed,
+        "status": focus_status(rel_low, confirmed),
+        "tiles": [
+            [round(float(teng[r, c]), 1) if valid[r, c] else None for c in range(cols)]
+            for r in range(rows)
+        ],
+        "tilesRel": [
+            [round(float(rel[r, c]), 3) if usable[r, c] else None for c in range(cols)]
+            for r in range(rows)
+        ],
+    })
+    return result
+
+
+def analyze_focus_safe(frame):
+    """Capture/Save tidak boleh gagal hanya karena analisis kualitas error."""
+    try:
+        return analyze_focus(frame)
+    except Exception as e:
+        print(f"[DEBUG] analyze_focus gagal: {e}")
+        return {"valid": False, "error": str(e)}
+
+
+class ClipQuality:
+    """Skor semantik CLIP (kepadatan sel), opsional dan dimuat malas.
+
+    Nonaktif kecuali CLIP_QUALITY=1. Model dimuat di thread latar pada request
+    pertama supaya tidak menahan startup dan aman terhadap reloader Flask
+    debug. Hanya encoder gambar yang jalan per Capture; embedding teks
+    dihitung sekali saat model dimuat.
+    """
+
+    def __init__(self):
+        self.state = "idle" if CLIP_ENABLED else "disabled"
+        self.error = None
+        self._state_lock = threading.Lock()
+        self._infer_lock = threading.Lock()
+
+    def ensure_started(self):
+        with self._state_lock:
+            if self.state != "idle":
+                return
+            self.state = "loading"
+        threading.Thread(target=self._load, daemon=True).start()
+
+    def _load(self):
+        try:
+            import torch
+            import open_clip
+
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+            model, _, preprocess = open_clip.create_model_and_transforms(
+                CLIP_MODEL_NAME, pretrained=CLIP_PRETRAINED, device=device
+            )
+            model.eval()
+            tokenizer = open_clip.get_tokenizer(CLIP_MODEL_NAME)
+            norm = [t for t in preprocess.transforms if t.__class__.__name__ == "Normalize"][0]
+            size = model.visual.image_size
+            size = int(size[0] if isinstance(size, (tuple, list)) else size)
+
+            def encode_text(prompts):
+                with torch.no_grad():
+                    t = model.encode_text(tokenizer(prompts).to(device)).float()
+                return t / t.norm(dim=-1, keepdim=True)
+
+            def class_vec(prompts):
+                v = encode_text(prompts).mean(0)
+                return v / v.norm()
+
+            self._text = {
+                "kepadatan": encode_text(list(_CLIP_DENSITY_PAIR)),                       # (2, D)
+                "gabungan_v2": torch.stack([class_vec(_CLIP_POS_V2), class_vec(_CLIP_NEG_V2)]),
+            }
+            self._torch = torch
+            self._model = model
+            self._device = device
+            self._size = size
+            self._mean = torch.tensor(norm.mean, device=device).view(1, 3, 1, 1)
+            self._std = torch.tensor(norm.std, device=device).view(1, 3, 1, 1)
+            self._logit_scale = float(model.logit_scale.exp().item())
+            self.state = "ready"
+            print(f"[DEBUG] CLIP siap: {CLIP_MODEL_NAME}/{CLIP_PRETRAINED} di {device}")
+        except Exception as e:
+            self.error = f"{type(e).__name__}: {e}"
+            self.state = "error"
+            print(f"[DEBUG] CLIP gagal dimuat: {self.error}")
+
+    def score(self, frame_bgr):
+        """dict skor rata-rata semua crop, atau None kalau belum siap/gagal."""
+        if self.state != "ready":
+            return None
+        try:
+            torch = self._torch
+            rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
+            h, w = rgb.shape[:2]
+            crop = max(32, min(int(round(w * CLIP_CROP_FRAC)), h, w))
+            ys = np.linspace(0, h - crop, CLIP_GRID_ROWS).astype(int)
+            xs = np.linspace(0, w - crop, CLIP_GRID_COLS).astype(int)
+            patches = [
+                cv2.resize(rgb[y:y + crop, x:x + crop], (self._size, self._size), interpolation=cv2.INTER_AREA)
+                for y in ys for x in xs
+            ]
+            with self._infer_lock:
+                x = torch.from_numpy(np.stack(patches)).to(self._device).permute(0, 3, 1, 2).float() / 255
+                x = (x - self._mean) / self._std
+                with torch.no_grad(), torch.autocast(
+                    device_type=self._device, dtype=torch.float16, enabled=(self._device == "cuda")
+                ):
+                    feats = self._model.encode_image(x)
+                feats = feats.float()
+                norms = feats.norm(dim=-1)
+                unit = feats / norms.unsqueeze(-1)
+                out = {
+                    "model": f"{CLIP_MODEL_NAME}/{CLIP_PRETRAINED}",
+                    "crops": len(patches),
+                    "norm": float(norms.mean()),
+                }
+                for name, text in self._text.items():
+                    out[name] = float((self._logit_scale * unit @ text.T).softmax(-1)[:, 0].mean())
+            return out
+        except Exception as e:
+            print(f"[DEBUG] CLIP score gagal: {e}")
+            return None
+
+
+clip_quality = ClipQuality()
+
+
 def resize_for_save(frame, target_width, target_height):
     """Resize gambar sebelum disimpan."
     """
@@ -586,10 +933,21 @@ def log_capture_csv(folder, row):
     """Tambahkan satu baris metadata ke capture_log.csv di folder tujuan."""
     log_path = os.path.join(folder, LOG_FILENAME)
     is_new = not os.path.exists(log_path)
+    # Kolom setelah focus_score ditambahkan belakangan (kualitas fokus per tile
+    # + skor CLIP opsional). focus_score tetap variance Laplacian lama supaya
+    # log lama masih sebanding; tile_*/rel_*/clip_* untuk kalibrasi nanti.
     fieldnames = [
         "timestamp", "patient_id", "filename", "iterasi",
         "camera", "resolution", "focus_score",
+        "tile_median", "tile_low", "tile_center", "tile_edge", "tile_valid_frac",
+        "edge_ratio", "edge_warn",
+        "rel_low", "rel_median", "focus_status", "tile_map_json",
+        "clip_kepadatan", "clip_gabungan_v2", "clip_norm", "clip_model",
     ]
+    if not is_new:
+        # Migrasi in-place kalau capture_log.csv dari versi lama belum punya
+        # kolom baru (dipanggil di dalam save_lock oleh api_save).
+        _ensure_log_columns(log_path, fieldnames)
     with open(log_path, "a", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         if is_new:
@@ -665,12 +1023,88 @@ def api_capture():
         return jsonify({"ok": False, "message": "Belum ada frame dari kamera."}), 400
     b64 = frame_to_png_base64(frame)
     focus_score = camera.captured_focus_score
+
+    # Analisis kualitas seluruh frame (peak-hold per tile). Skor CLIP (~1,2 dtk)
+    # sengaja tidak dihitung di sini supaya gambar cepat tampil; frontend
+    # memintanya lewat /api/capture/clip setelah gambar muncul.
+    quality = analyze_focus_safe(frame)
+    quality["laplacian"] = round(focus_score, 1)
+    clip_quality.ensure_started()
+    camera.captured_quality = quality
+    capture_id = camera.capture_seq
+
     return jsonify({
         "ok": True,
+        "captureId": capture_id,
         "image": b64,
+        # focusScore/focusLabel = variance Laplacian lama, dipertahankan untuk
+        # pembanding; penilaian utama sekarang ada di "quality".
         "focusScore": round(focus_score, 1),
         "focusLabel": "Baik" if focus_score >= FOCUS_BLUR_THRESHOLD else "Buram",
         "blankWarning": is_blank_frame(frame),
+        "quality": quality,
+        "semantic": None,
+        "clipState": clip_quality.state,
+    })
+
+
+@app.route("/api/capture/clip", methods=["POST"])
+def api_capture_clip():
+    """Skor CLIP untuk capture terakhir, dipanggil setelah gambar tampil."""
+    capture_id = (request.json or {}).get("captureId")
+    frame = camera.captured_frame
+    if frame is None or capture_id != camera.capture_seq:
+        return jsonify({"ok": False, "stale": True})
+    # Frame hitam/seragam memberi skor CLIP yang menyesatkan (gabungan_v2 ~0,58
+    # pada gambar hitam, sama dengan frame nyata), jadi dilewati.
+    if is_blank_frame(frame):
+        camera.captured_semantic = None
+        return jsonify({"ok": True, "semantic": None, "clipState": clip_quality.state, "blank": True})
+    semantic = clip_quality.score(frame)
+    if capture_id != camera.capture_seq:   # ada capture baru selama menghitung
+        return jsonify({"ok": False, "stale": True})
+    camera.captured_semantic = semantic
+    return jsonify({"ok": True, "semantic": semantic, "clipState": clip_quality.state})
+
+
+@app.route("/api/focus/live")
+def api_focus_live():
+    """Kualitas fokus seluruh frame pada frame terbaru (dipoll UI ~1,5x/detik)."""
+    if not camera.is_connected():
+        return jsonify({"ok": False, "message": "Kamera belum terhubung."})
+    with camera.lock:
+        frame = camera.last_frame
+    if frame is None:
+        return jsonify({"ok": False, "message": "Belum ada frame."})
+    clip_quality.ensure_started()
+    quality = analyze_focus_safe(frame)
+    # Variance Laplacian (metode lama) ikut ditampilkan sebagai pembanding live.
+    quality["laplacian"] = round(compute_focus_score(frame), 1)
+    return jsonify({"ok": True, "quality": quality, "clipState": clip_quality.state})
+
+
+@app.route("/api/focus/reset-peak", methods=["POST"])
+def api_focus_reset_peak():
+    """Buang referensi puncak (mis. saat pindah lapang pandang secara manual)."""
+    focus_tracker.reset()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/quality/status")
+def api_quality_status():
+    return jsonify({
+        "clip": {
+            "state": clip_quality.state,
+            "error": clip_quality.error,
+            "model": f"{CLIP_MODEL_NAME}/{CLIP_PRETRAINED}",
+        },
+        "focus": {
+            "cols": FOCUS_TILE_COLS,
+            "rows": FOCUS_TILE_ROWS,
+            "relGood": FOCUS_REL_GOOD,
+            "relWarn": FOCUS_REL_WARN,
+            "edgeRatioWarn": FOCUS_EDGE_RATIO_WARN,
+        },
     })
 
 
@@ -714,6 +1148,15 @@ def api_save():
     if camera.captured_frame is None:
         return jsonify({"ok": False, "message": "Belum ada gambar yang di-capture."}), 400
 
+    # Skor CLIP dihitung terpisah setelah Capture; kalau Save datang sebelum
+    # selesai, hitung di sini supaya log tidak kosong.
+    if (camera.captured_semantic is None and clip_quality.state == "ready"
+            and not is_blank_frame(camera.captured_frame)):
+        seq = camera.capture_seq
+        semantic = clip_quality.score(camera.captured_frame)
+        if seq == camera.capture_seq:
+            camera.captured_semantic = semantic
+
     slug = safe_slug(patient_name)
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
 
@@ -738,6 +1181,13 @@ def api_save():
             return jsonify({"ok": False, "message": "Gagal menyimpan file."}), 500
 
         height, width = frame_to_save.shape[:2]
+        quality = camera.captured_quality or {}
+        semantic = camera.captured_semantic or {}
+
+        def _fmt(value, digits):
+            return "" if value is None else round(value, digits)
+
+        tiles = quality.get("tiles")
         log_capture_csv(folder, {
             "timestamp": timestamp,
             "patient_id": slug,
@@ -746,6 +1196,21 @@ def api_save():
             "camera": camera_name or "?",
             "resolution": f"{width}x{height}",
             "focus_score": round(camera.captured_focus_score or 0, 1),
+            "tile_median": _fmt(quality.get("median"), 2),
+            "tile_low": _fmt(quality.get("low"), 2),
+            "tile_center": _fmt(quality.get("center"), 2),
+            "tile_edge": _fmt(quality.get("edge"), 2),
+            "tile_valid_frac": _fmt(quality.get("validFrac"), 3),
+            "edge_ratio": _fmt(quality.get("edgeRatio"), 3),
+            "edge_warn": "" if quality.get("edgeWarn") is None else int(bool(quality["edgeWarn"])),
+            "rel_low": _fmt(quality.get("relLow"), 3),
+            "rel_median": _fmt(quality.get("relMedian"), 3),
+            "focus_status": quality.get("status") or "",
+            "tile_map_json": json.dumps(tiles, separators=(",", ":")) if tiles else "",
+            "clip_kepadatan": _fmt(semantic.get("kepadatan"), 4),
+            "clip_gabungan_v2": _fmt(semantic.get("gabungan_v2"), 4),
+            "clip_norm": _fmt(semantic.get("norm"), 3),
+            "clip_model": semantic.get("model") or "",
         })
 
     return jsonify(

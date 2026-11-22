@@ -116,6 +116,8 @@
               <div class="badge-group">
                 <div id="focusBadge" class="badge badge-hidden"></div>
                 <div id="blankBadge" class="badge badge-hidden"></div>
+                <div id="edgeBadge" class="badge badge-hidden"></div>
+                <div id="semanticBadge" class="badge badge-hidden"></div>
                 <div id="captureBadge" class="badge badge-hidden"></div>
               </div>
             </div>
@@ -123,6 +125,43 @@
               <span class="placeholder-text">Belum ada gambar</span>
             </div>
             <div id="captureFilename" class="capture-filename"></div>
+          </div>
+        </div>
+
+        <div id="focusCard" class="focus-card focus-card-hidden">
+          <div class="focus-card-head">
+            <div class="panel-title">
+              <span class="dot dot-live"></span>Kualitas Fokus (seluruh frame)
+            </div>
+            <div class="focus-card-actions">
+              <label class="focus-toggle">
+                <input type="checkbox" id="focusLiveToggle" checked /> Live
+              </label>
+              <button
+                id="btnResetPeak"
+                class="btn btn-outline btn-small"
+                title="Buang referensi puncak. Berjalan otomatis saat lapang pandang berganti."
+              >
+                Reset puncak
+              </button>
+            </div>
+          </div>
+          <div class="focus-card-body">
+            <div
+              id="focusMap"
+              class="focus-map"
+              title="Peta ketajaman per tile, dibandingkan dengan puncak tile itu sendiri"
+            ></div>
+            <div class="focus-stats">
+              <div id="focusStatusLine" class="focus-status focus-status-neutral">
+                Menunggu frame...
+              </div>
+              <div class="focus-bar"><div id="focusBarFill" class="focus-bar-fill"></div></div>
+              <div id="focusDetail" class="focus-detail"></div>
+              <div id="focusEdgeWarn" class="focus-warn focus-warn-hidden"></div>
+              <div id="focusHint" class="focus-hint"></div>
+              <div id="clipLine" class="focus-hint"></div>
+            </div>
           </div>
         </div>
 
@@ -442,6 +481,23 @@
     </div>
 
     <div id="toast" class="toast toast-hidden"></div>
+
+    <div id="imagePreview" class="modal-overlay image-preview modal-hidden">
+      <div class="image-preview-box">
+        <div class="image-preview-head">
+          <span id="imagePreviewTitle" class="image-preview-title"></span>
+          <button id="btnClosePreview" class="summary-close" title="Tutup (Esc)">&times;</button>
+        </div>
+        <div id="imagePreviewBody" class="image-preview-body">
+          <img id="imagePreviewImg" alt="Preview hasil capture" />
+        </div>
+        <div class="image-preview-foot">
+          <button id="btnPreviewPrev" class="btn btn-outline btn-small">&lsaquo; Sebelumnya</button>
+          <span id="imagePreviewInfo" class="image-preview-info"></span>
+          <button id="btnPreviewNext" class="btn btn-outline btn-small">Berikutnya &rsaquo;</button>
+        </div>
+      </div>
+    </div>
 
     <div id="confirmModal" class="modal-overlay modal-hidden">
       <div class="modal-box">

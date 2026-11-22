@@ -76,6 +76,18 @@ const captureBody = document.getElementById("captureBody");
 const captureBadge = document.getElementById("captureBadge");
 const focusBadge = document.getElementById("focusBadge");
 const blankBadge = document.getElementById("blankBadge");
+const semanticBadge = document.getElementById("semanticBadge");
+const edgeBadge = document.getElementById("edgeBadge");
+const focusEdgeWarn = document.getElementById("focusEdgeWarn");
+const focusCard = document.getElementById("focusCard");
+const focusMap = document.getElementById("focusMap");
+const focusStatusLine = document.getElementById("focusStatusLine");
+const focusBarFill = document.getElementById("focusBarFill");
+const focusDetail = document.getElementById("focusDetail");
+const focusHint = document.getElementById("focusHint");
+const clipLine = document.getElementById("clipLine");
+const focusLiveToggle = document.getElementById("focusLiveToggle");
+const btnResetPeak = document.getElementById("btnResetPeak");
 const captureFilename = document.getElementById("captureFilename");
 const captureCount = document.getElementById("captureCount");
 const patientNameInput = document.getElementById("patientName");
@@ -132,6 +144,9 @@ let lastCapturedImage = null; // base64 PNG hasil capture terakhir (buat thumbna
 let lastSavedFullPath = null; // path lengkap hasil Save terakhir (buat "Kirim ke Segmentasi")
 let currentCaptureSaved = false; // true kalau capture yang aktif sekarang sudah pernah di-save
 let currentCaptureSavedAs = null; // nama file terakhir dari capture yang aktif sekarang
+let currentCaptureFocus = null; // {status, relLow} kualitas fokus seluruh frame dari capture yang aktif (lihat /api/capture)
+let focusPollBusy = false; // cegah request /api/focus/live menumpuk
+let focusMapKey = null; // "ROWSxCOLS" peta tile yang sudah dibangun
 let isCameraConnected = false; // dipakai checkCameraStatus() buat deteksi kamera dicabut fisik
 
 function showToast(message) {
@@ -210,6 +225,7 @@ function applyConnectedUI(selectedName, width, height) {
   btnCapture.disabled = false;
   if (btnCameraSettings) btnCameraSettings.disabled = false;
   isCameraConnected = true;
+  focusCard.classList.remove("focus-card-hidden");
 }
 
 async function connectCamera() {
@@ -256,6 +272,7 @@ function handleCameraDisconnected() {
     '<span class="placeholder-text">Kamera tidak terhubung<br />Hubungkan kamera USB mikroskop untuk memulai</span>';
   btnCapture.disabled = true;
   if (btnCameraSettings) btnCameraSettings.disabled = true;
+  focusCard.classList.add("focus-card-hidden");
   showToast("Koneksi ke kamera terputus. Cek kabel USB, lalu klik Hubungkan lagi.");
 }
 
@@ -313,6 +330,243 @@ async function openCameraSettings() {
   showToast("Resolusi kamera saat ini: " + data.width + "x" + data.height);
 }
 
+// -----------------------------------------------------------------------
+// Kualitas fokus seluruh frame (Tenengrad per tile, relatif terhadap puncak
+// tile itu sendiri) -- lihat FocusTracker di app.py. Nilai mentah antar
+// lapang pandang tidak sebanding, jadi yang ditampilkan selalu % dari puncak
+// yang teramati sejak fokus mulai diputar di lapang pandang yang sama.
+// -----------------------------------------------------------------------
+const FOCUS_STATUS_LABEL = { baik: "Baik", sedang: "Sedang", buram: "Buram" };
+const FOCUS_STATUS_STATUS_CLASS = {
+  baik: "focus-status-good",
+  sedang: "focus-status-mid",
+  buram: "focus-status-bad",
+};
+const FOCUS_STATUS_BADGE_CLASS = {
+  baik: "badge-focus-good",
+  sedang: "badge-focus-mid",
+  buram: "badge-focus-bad",
+};
+
+function buildFocusMap(rows, cols) {
+  focusMap.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+  focusMap.innerHTML = "";
+  for (let i = 0; i < rows * cols; i++) {
+    const cell = document.createElement("div");
+    cell.className = "focus-cell";
+    focusMap.appendChild(cell);
+  }
+  focusMapKey = `${rows}x${cols}`;
+}
+
+// 40% dari puncak = merah, 100% = hijau
+function relToColor(rel) {
+  const t = Math.max(0, Math.min(1, (rel - 0.4) / 0.6));
+  return `hsl(${Math.round(t * 120)}, 65%, 48%)`;
+}
+
+function renderFocusMap(q) {
+  if (!q || !q.valid) return;
+  if (focusMapKey !== `${q.rows}x${q.cols}`) buildFocusMap(q.rows, q.cols);
+  const cells = focusMap.children;
+  for (let r = 0; r < q.rows; r++) {
+    for (let c = 0; c < q.cols; c++) {
+      const cell = cells[r * q.cols + c];
+      const raw = q.tiles[r][c];
+      const rel = q.tilesRel[r][c];
+      if (raw === null) {
+        cell.className = "focus-cell focus-cell-empty";
+        cell.style.background = "";
+        cell.title = "Tile kosong (tanpa sel), tidak dihitung";
+      } else if (!q.confirmed || rel === null) {
+        // Belum ada puncak terkonfirmasi: jangan beri warna yang menyiratkan penilaian.
+        cell.className = "focus-cell focus-cell-neutral";
+        cell.style.background = "";
+        cell.title = `Tenengrad ${raw}`;
+      } else {
+        cell.className = "focus-cell";
+        cell.style.background = relToColor(rel);
+        cell.title = `Tenengrad ${raw} (${Math.round(rel * 100)}% dari puncak tile ini)`;
+      }
+    }
+  }
+}
+
+// Peringatan pinggir lebih lemah dari tengah (rasio Tenengrad tepi/tengah di
+// bawah ambang). Petunjuk satu-frame saja, tidak mengubah status fokus: status
+// hanya menilai setelan fokus relatif terhadap puncak tiap tile, jadi pinggir
+// yang buram bawaan tidak terlihat olehnya.
+function edgeWarnText(q) {
+  return (
+    `Pinggir frame lebih lemah dari tengah (tepi/tengah ${q.edgeRatio.toFixed(2)}). ` +
+    `Periksa pojok-pojok gambar; bisa karena pinggir kurang fokus, atau sel di pinggir lebih jarang.`
+  );
+}
+
+function renderFocusStatus(q) {
+  if (!q || !q.valid) {
+    focusStatusLine.className = "focus-status focus-status-neutral";
+    focusStatusLine.textContent = "Tidak ada sel terdeteksi di frame";
+    focusBarFill.style.width = "0";
+    focusDetail.textContent = "";
+    focusEdgeWarn.className = "focus-warn focus-warn-hidden";
+    focusHint.textContent = "Frame kosong/seragam atau lensa tertutup.";
+    return;
+  }
+  if (q.edgeWarn) {
+    focusEdgeWarn.textContent = edgeWarnText(q);
+    focusEdgeWarn.className = "focus-warn";
+  } else {
+    focusEdgeWarn.className = "focus-warn focus-warn-hidden";
+  }
+  if (q.status) {
+    const pct = Math.round(q.relLow * 100);
+    focusStatusLine.className = "focus-status " + FOCUS_STATUS_STATUS_CLASS[q.status];
+    focusStatusLine.textContent = `Fokus ${FOCUS_STATUS_LABEL[q.status]} (${pct}% dari puncak)`;
+    focusBarFill.style.width = pct + "%";
+    focusBarFill.style.background = relToColor(q.relLow);
+    focusHint.textContent = "";
+  } else {
+    focusStatusLine.className = "focus-status focus-status-neutral";
+    focusStatusLine.textContent = "Puncak fokus belum terkonfirmasi";
+    focusBarFill.style.width = "0";
+    focusHint.textContent =
+      "Putar fokus sedikit melewati titik paling tajam, lalu kembali, supaya ada pembanding.";
+  }
+  if (q.changed) focusHint.textContent = "Lapang pandang berganti, referensi puncak direset otomatis.";
+  const fmt = (v) => (v === null || v === undefined ? "-" : v.toFixed(1));
+  const ratio = q.edgeRatio === null || q.edgeRatio === undefined ? "-" : q.edgeRatio.toFixed(2);
+  focusDetail.textContent =
+    `Tenengrad median tile ${fmt(q.median)} · tengah ${fmt(q.center)} · tepi ${fmt(q.edge)} ` +
+    `(tepi/tengah ${ratio}) · tile berisi sel ${Math.round(q.validFrac * 100)}%` +
+    (q.laplacian === undefined ? "" : ` · Laplacian ${q.laplacian.toFixed(1)}`);
+}
+
+function renderClipLine(state) {
+  const text = {
+    loading: "Semantik CLIP: memuat model...",
+    ready: "Semantik CLIP: aktif (dihitung saat Capture)",
+    error: "Semantik CLIP: gagal dimuat, lihat konsol server",
+  }[state];
+  clipLine.textContent = text || "";
+}
+
+async function pollFocusLive() {
+  if (focusPollBusy || !isCameraConnected || !focusLiveToggle.checked || document.hidden) return;
+  if (captureView.classList.contains("view-hidden")) return;
+  focusPollBusy = true;
+  try {
+    const res = await fetch("/api/focus/live");
+    const data = await res.json();
+    if (data.ok) {
+      renderFocusMap(data.quality);
+      renderFocusStatus(data.quality);
+      renderClipLine(data.clipState);
+    }
+  } catch (e) {
+    // Abaikan error sesaat, polling berikutnya akan mencoba lagi.
+  } finally {
+    focusPollBusy = false;
+  }
+}
+
+async function resetFocusPeak() {
+  try {
+    await fetch("/api/focus/reset-peak", { method: "POST" });
+  } catch (e) {
+    return;
+  }
+  focusHint.textContent = "Referensi puncak direset.";
+}
+
+function renderCaptureFocusBadge(data) {
+  const q = data.quality;
+  const legacy = `Variance Laplacian (metode lama): ${data.focusScore} (${data.focusLabel})`;
+  if (!q || !q.valid) {
+    // Analisis per tile gagal/kosong: pakai skor lama sebagai cadangan.
+    currentCaptureFocus = null;
+    edgeBadge.textContent = "";
+    edgeBadge.className = "badge badge-hidden";
+    focusBadge.textContent =
+      data.focusLabel === "Baik"
+        ? `Fokus: Baik (${data.focusScore})`
+        : `Fokus: Buram (${data.focusScore})`;
+    focusBadge.className =
+      "badge " + (data.focusLabel === "Baik" ? "badge-focus-good" : "badge-focus-bad");
+    focusBadge.title = legacy;
+    return;
+  }
+  currentCaptureFocus = { status: q.status, relLow: q.relLow };
+  if (q.status) {
+    focusBadge.textContent = `Fokus ${FOCUS_STATUS_LABEL[q.status]}: ${Math.round(q.relLow * 100)}% puncak`;
+    focusBadge.className = "badge " + FOCUS_STATUS_BADGE_CLASS[q.status];
+  } else {
+    focusBadge.textContent = "Fokus: puncak belum terkonfirmasi";
+    focusBadge.className = "badge badge-focus-neutral";
+  }
+  focusBadge.title =
+    `Tenengrad median tile ${q.median.toFixed(1)}, area terburuk (P25) ${q.low.toFixed(1)}\n` + legacy;
+  if (q.edgeWarn) {
+    edgeBadge.textContent = `Pinggir lemah (${q.edgeRatio.toFixed(2)})`;
+    edgeBadge.className = "badge badge-focus-mid";
+    edgeBadge.title = edgeWarnText(q);
+  } else {
+    edgeBadge.textContent = "";
+    edgeBadge.className = "badge badge-hidden";
+  }
+  renderFocusMap(q);
+  renderFocusStatus(q);
+}
+
+function renderSemanticBadge(data) {
+  const s = data.semantic;
+  if (s) {
+    semanticBadge.textContent =
+      `Kepadatan CLIP: ${Math.round(s.kepadatan * 100)}% · Gabungan v2: ${Math.round(s.gabungan_v2 * 100)}%`;
+    semanticBadge.className = "badge badge-semantic";
+    semanticBadge.title =
+      `Skor semantik CLIP (eksperimen, belum divalidasi dokter)\n` +
+      `kepadatan ${s.kepadatan.toFixed(3)} · gabungan_v2 ${s.gabungan_v2.toFixed(3)} · norma ${s.norm.toFixed(2)}\n` +
+      `${s.model}, ${s.crops} crop seluruh frame`;
+  } else if (data.clipState === "loading") {
+    semanticBadge.textContent = "CLIP: memuat model...";
+    semanticBadge.className = "badge badge-focus-neutral";
+    semanticBadge.title = "";
+  } else if (data.clipState === "error") {
+    semanticBadge.textContent = "CLIP: error";
+    semanticBadge.className = "badge badge-focus-bad";
+    semanticBadge.title = "Lihat konsol server";
+  } else {
+    semanticBadge.textContent = "";
+    semanticBadge.className = "badge badge-hidden";
+  }
+}
+
+let currentCaptureId = null; // nomor capture yang sedang tampil, untuk membuang skor CLIP yang terlambat
+
+async function fetchCaptureClip(captureId) {
+  try {
+    const res = await fetch("/api/capture/clip", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ captureId }),
+    });
+    const data = await res.json();
+    if (captureId !== currentCaptureId) return;
+    if (data.ok && data.blank) {
+      semanticBadge.textContent = "CLIP: frame kosong, dilewati";
+      semanticBadge.className = "badge badge-focus-neutral";
+      semanticBadge.title = "Frame hitam/seragam: skor CLIP tidak bermakna sehingga tidak dihitung dan tidak dicatat di log.";
+    } else if (data.ok) {
+      renderSemanticBadge(data);
+    } else if (!data.stale) {
+      renderSemanticBadge({ semantic: null, clipState: "error" });
+    }
+  } catch (e) {
+    if (captureId === currentCaptureId) renderSemanticBadge({ semantic: null, clipState: "error" });
+  }
+}
+
 async function doCapture() {
   const res = await fetch("/api/capture", { method: "POST" });
   const data = await res.json();
@@ -329,12 +583,17 @@ async function doCapture() {
   currentCaptureSaved = false;
   currentCaptureSavedAs = null;
 
-  focusBadge.textContent =
-    data.focusLabel === "Baik"
-      ? `Fokus: Baik (${data.focusScore})`
-      : `Fokus: Buram (${data.focusScore})`;
-  focusBadge.className =
-    "badge " + (data.focusLabel === "Baik" ? "badge-focus-good" : "badge-focus-bad");
+  renderCaptureFocusBadge(data);
+  currentCaptureId = data.captureId;
+  if (data.clipState === "ready") {
+    // Skor CLIP lambat (~1 dtk), jadi diminta terpisah setelah gambar tampil.
+    semanticBadge.textContent = "CLIP: menghitung...";
+    semanticBadge.className = "badge badge-focus-neutral";
+    semanticBadge.title = "";
+    fetchCaptureClip(data.captureId);
+  } else {
+    renderSemanticBadge(data);
+  }
 
   if (data.blankWarning) {
     blankBadge.textContent = "Kosong/Seragam";
@@ -362,19 +621,114 @@ async function doSelectFolder() {
   loadFolderSummary();
 }
 
+// Riwayat sesi: tiap item menyimpan gambar hasil capture (resolusi asli kamera,
+// bukan versi yang diperkecil oleh pilihan resolusi saat Save) plus ringkasan
+// badge kualitas saat disimpan, supaya bisa dipreview lagi dan dibandingkan.
+const galleryEntries = [];
+let previewIndex = -1;
+
+const imagePreview = document.getElementById("imagePreview");
+const imagePreviewBody = document.getElementById("imagePreviewBody");
+const imagePreviewImg = document.getElementById("imagePreviewImg");
+const imagePreviewTitle = document.getElementById("imagePreviewTitle");
+const imagePreviewInfo = document.getElementById("imagePreviewInfo");
+const btnClosePreview = document.getElementById("btnClosePreview");
+const btnPreviewPrev = document.getElementById("btnPreviewPrev");
+const btnPreviewNext = document.getElementById("btnPreviewNext");
+
+function captureInfoSnapshot() {
+  return [focusBadge, edgeBadge, semanticBadge]
+    .map((el) => el.textContent.trim())
+    .filter(Boolean)
+    .join(" · ");
+}
+
 function addToGallery(filename, thumbnailBase64) {
   const empty = galleryStrip.querySelector(".gallery-empty");
   if (empty) empty.remove();
 
+  const index = galleryEntries.length;
+  galleryEntries.push({ filename, image: thumbnailBase64, info: captureInfoSnapshot() });
+
   const item = document.createElement("div");
   item.className = "gallery-item";
+  item.tabIndex = 0;
+  item.title = "Klik untuk preview";
   item.innerHTML = `
     <img src="data:image/png;base64,${thumbnailBase64}" alt="${filename}" />
     <div class="gallery-label" title="${filename}">${filename}</div>
   `;
+  item.addEventListener("click", () => openImagePreview(index));
+  item.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter") return;
+    // Jangan sampai Enter di sini ikut memicu shortcut Save.
+    e.preventDefault();
+    e.stopPropagation();
+    openImagePreview(index);
+  });
   galleryStrip.appendChild(item);
   galleryStrip.scrollLeft = galleryStrip.scrollWidth;
 }
+
+function isImagePreviewOpen() {
+  return !imagePreview.classList.contains("modal-hidden");
+}
+
+function openImagePreview(index) {
+  const entry = galleryEntries[index];
+  if (!entry) return;
+  previewIndex = index;
+  imagePreviewImg.classList.remove("image-preview-zoomed");
+  imagePreviewImg.src = "data:image/png;base64," + entry.image;
+  imagePreviewBody.scrollTop = 0;
+  imagePreviewBody.scrollLeft = 0;
+  imagePreviewTitle.textContent = `${entry.filename}  (${index + 1}/${galleryEntries.length})`;
+  imagePreviewInfo.textContent = entry.info;
+  btnPreviewPrev.disabled = index === 0;
+  btnPreviewNext.disabled = index === galleryEntries.length - 1;
+  imagePreview.classList.remove("modal-hidden");
+}
+
+function closeImagePreview() {
+  imagePreview.classList.add("modal-hidden");
+  imagePreviewImg.src = "";
+  previewIndex = -1;
+}
+
+function stepImagePreview(delta) {
+  const next = previewIndex + delta;
+  if (next >= 0 && next < galleryEntries.length) openImagePreview(next);
+}
+
+// Info lengkap (ukuran piksel + hint zoom) baru diketahui setelah gambar termuat.
+imagePreviewImg.addEventListener("load", () => {
+  if (!isImagePreviewOpen() || previewIndex < 0) return;
+  const entry = galleryEntries[previewIndex];
+  const dims = `${imagePreviewImg.naturalWidth}x${imagePreviewImg.naturalHeight}`;
+  imagePreviewInfo.textContent =
+    (entry.info ? entry.info + " · " : "") + dims + " · klik gambar untuk zoom 100%";
+});
+imagePreviewImg.addEventListener("click", () => {
+  imagePreviewImg.classList.toggle("image-preview-zoomed");
+});
+imagePreview.addEventListener("click", (e) => {
+  if (e.target === imagePreview) closeImagePreview(); // klik area gelap di luar kotak
+});
+btnClosePreview.addEventListener("click", closeImagePreview);
+btnPreviewPrev.addEventListener("click", () => stepImagePreview(-1));
+btnPreviewNext.addEventListener("click", () => stepImagePreview(1));
+
+// Didaftarkan lebih awal dari shortcut lain (Spasi = Capture, Enter = Save,
+// shortcut Segmentasi) supaya selama preview terbuka tombol-tombol itu tidak
+// ikut bereaksi.
+window.addEventListener("keydown", (e) => {
+  if (!isImagePreviewOpen()) return;
+  e.stopImmediatePropagation();
+  if (e.key === "Escape") closeImagePreview();
+  else if (e.key === "ArrowLeft") stepImagePreview(-1);
+  else if (e.key === "ArrowRight") stepImagePreview(1);
+  if (e.key === " " || e.code === "Space") e.preventDefault(); // cegah halaman ikut scroll
+});
 
 let summaryDismissed = false; // true kalau user sengaja nutup panel ringkasan
 
@@ -422,6 +776,16 @@ async function doSave() {
     const lanjut = await showConfirmModal(
       `Gambar ini sudah disimpan sebelumnya sebagai "${currentCaptureSavedAs}".\n\n` +
       `Simpan lagi sebagai file baru (isi gambarnya tetap sama)?`
+    );
+    if (!lanjut) return;
+  }
+
+  // Peringatan (bukan pemblokiran): fokus terdeteksi buram relatif terhadap
+  // puncak yang teramati. Ambangnya masih heuristik, jadi keputusan tetap di operator.
+  if (currentCaptureFocus && currentCaptureFocus.status === "buram") {
+    const lanjut = await showConfirmModal(
+      `Fokus gambar ini terdeteksi buram (${Math.round(currentCaptureFocus.relLow * 100)}% dari puncak fokus).\n\n` +
+      `Tetap simpan?`
     );
     if (!lanjut) return;
   }
@@ -1835,6 +2199,7 @@ btnConnectCamera.addEventListener("click", connectCamera);
 if (btnCameraSettings) btnCameraSettings.addEventListener("click", openCameraSettings);
 btnRefreshCameras.addEventListener("click", loadCameras);
 btnCapture.addEventListener("click", doCapture);
+btnResetPeak.addEventListener("click", resetFocusPeak);
 btnFolder.addEventListener("click", doSelectFolder);
 btnSave.addEventListener("click", doSave);
 btnSummary.addEventListener("click", loadFolderSummary);
@@ -1860,3 +2225,4 @@ loadCameras().then(restoreCameraStatusIfConnected);
 loadClassLegend();
 loadSegModelStatus();
 setInterval(checkCameraStatus, 2000);
+setInterval(pollFocusLive, 700);

@@ -218,3 +218,8 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+# Output skrip preprocess_compare.py
+preproc_compare_out/
+
+# File sementara (log, skrip uji, keluaran)
+/tmp/

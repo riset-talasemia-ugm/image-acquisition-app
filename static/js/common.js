@@ -1,6 +1,7 @@
 // Elemen dan fungsi bersama kedua layar: toast, modal pilihan, pindah layar.
 const tabCapture = document.getElementById("tabCapture");
 const tabSegmentation = document.getElementById("tabSegmentation");
+const tabRating = document.getElementById("tabRating");
 const captureView = document.getElementById("captureView");
 const segmentationView = document.getElementById("segmentationView");
 
@@ -93,8 +94,24 @@ function showChoiceModal(message, choices) {
     function cleanup(value) {
       confirmModal.classList.add("modal-hidden");
       confirmModalActions.innerHTML = "";
+      window.removeEventListener("keydown", onKey, true);
       resolve(value);
     }
+
+    // Spasi = Ambil citra di layar Akuisisi; jangan sampai Spasi yang ditekan
+    // karena kebiasaan malah menekan tombol modal (mis. "tetap simpan" citra
+    // buram). Enter memilih tombol yang disorot, Esc = pilihan pertama (batal).
+    function onKey(e) {
+      if (e.key === " " || e.code === "Space") {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        cleanup(choices[0].value);
+      }
+    }
+    window.addEventListener("keydown", onKey, true);
 
     choices.forEach((choice) => {
       const btn = document.createElement("button");
@@ -106,7 +123,7 @@ function showChoiceModal(message, choices) {
     });
 
     confirmModal.classList.remove("modal-hidden");
-    // Fokus ke pilihan utama supaya Enter/Spasi langsung memilihnya.
+    // Fokus ke pilihan utama supaya Enter langsung memilihnya.
     const primary = confirmModalActions.querySelector(".btn-primary") || confirmModalActions.lastChild;
     if (primary) primary.focus();
   });
@@ -123,13 +140,17 @@ function showConfirmModal(message) {
 }
 
 function switchTab(tab) {
-  const isCapture = tab === "capture";
-  tabCapture.classList.toggle("tab-active", isCapture);
-  tabSegmentation.classList.toggle("tab-active", !isCapture);
-  captureView.classList.toggle("view-hidden", !isCapture);
-  segmentationView.classList.toggle("view-hidden", isCapture);
-  tabCapture.setAttribute("aria-current", isCapture ? "step" : "false");
-  tabSegmentation.setAttribute("aria-current", isCapture ? "false" : "step");
+  const views = {
+    capture: [tabCapture, captureView],
+    segmentation: [tabSegmentation, segmentationView],
+    rating: [tabRating, document.getElementById("ratingView")],
+  };
+  Object.entries(views).forEach(([name, [btn, view]]) => {
+    const on = name === tab;
+    btn.classList.toggle("tab-active", on);
+    btn.setAttribute("aria-current", on ? "step" : "false");
+    view.classList.toggle("view-hidden", !on);
+  });
 }
 
 // Dialog <dialog> (Laporan, Pengaturan model) atau modal konfirmasi/preview

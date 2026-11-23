@@ -105,4 +105,5 @@ Hanya penambahan field; field lama tidak berubah.
 - Rute baru (tercatat di `tests/test_v010.py`, `TestRoutes`):
   - `GET /api/system/status?folder=`: `bootId`, `time`, `clockSuspect`, `disk` {`path`, `free`, `total`, `low`} (F5, F11);
   - `GET|POST /api/recovery/capture`: salinan citra belum tersimpan di `recovery/` (UC-10); POST `{action: "restore"|"discard"}`;
+  - `POST /api/rating/next {folder, rater, id?}` dan `POST /api/rating/submit {folder, rater, id, verdict, reasons, note}`: lembar penilaian citra (F14, `rating.py`);
   - `POST /api/segmentation/open-path {path}`: buka gambar sumber tanpa dialog, bentuk respons sama dengan `select-image`.

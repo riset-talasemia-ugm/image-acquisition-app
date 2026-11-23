@@ -133,85 +133,31 @@ function renderClassSummary(counts) {
   renderClassChart(counts);
 }
 
-// Pembulatan "nice" buat jarak antar gridline sumbu Y (0/1/2/5x10^n) --
-// pola umum di library chart, biar angka di sumbu gampang dibaca (bukan
-// pecahan aneh kayak 0, 3.33, 6.67).
-function niceTickStep(maxValue, targetTicks = 5) {
-  if (maxValue <= 0) return 1;
-  const raw = maxValue / targetTicks;
-  const magnitude = Math.pow(10, Math.floor(Math.log10(raw)));
-  const norm = raw / magnitude;
-  let step;
-  if (norm < 1.5) step = 1;
-  else if (norm < 3) step = 2;
-  else if (norm < 7) step = 5;
-  else step = 10;
-  return step * magnitude;
-}
-
-// Grafik batang vertikal (SVG, tanpa library eksternal) buat ringkasan
-// klasifikasi per kelas -- pelengkap tampilan Tabel, biar sekali lihat
-// langsung kebaca kelas mana yang dominan.
+// Grafik batang horizontal jumlah sel per kelas. Panel kiri sempit (~260 px),
+// jadi label kelas di kiri dan angka di kanan dalam teks HTML biasa, bukan SVG
+// lebar yang diperkecil. Urutan = urutan kelas (sama dengan tabel dan tombol
+// 0-9); warna batang = warna kelas (data, sama dengan overlay sel).
 function renderClassChart(counts) {
   if (!counts) {
-    classChartBody.innerHTML =
-      '<span class="placeholder-text">Belum ada hasil untuk ditampilkan sebagai grafik.</span>';
+    classChartBody.innerHTML = '<span class="placeholder-text">Belum ada hasil untuk ditampilkan sebagai grafik.</span>';
     return;
   }
-
-  const chartW = 820;
-  const chartH = 340;
-  const marginLeft = 34;
-  const marginRight = 10;
-  const marginTop = 20;
-  const marginBottom = 96;
-  const plotW = chartW - marginLeft - marginRight;
-  const plotH = chartH - marginTop - marginBottom;
-
-  const n = segClassLabels.length;
-  const maxCount = Math.max(1, ...segClassLabels.map((c) => counts[c.label] ?? 0));
-  const tickStep = niceTickStep(maxCount);
-  const niceMax = Math.max(tickStep, Math.ceil(maxCount / tickStep) * tickStep);
-  const ticks = [];
-  for (let t = 0; t <= niceMax; t += tickStep) ticks.push(t);
-
-  const gridlines = ticks
-    .map((t) => {
-      const y = marginTop + plotH - (t / niceMax) * plotH;
+  const total = segClassLabels.reduce((sum, c) => sum + (counts[c.label] ?? 0), 0);
+  const max = Math.max(1, ...segClassLabels.map((c) => counts[c.label] ?? 0));
+  classChartBody.innerHTML = segClassLabels
+    .map((c) => {
+      const n = counts[c.label] ?? 0;
+      const pct = total ? ((n / total) * 100).toFixed(1) : "0.0";
+      const dim = segHighlightedClassIndex !== null && segHighlightedClassIndex !== c.index ? " hbar-dim" : "";
+      const active = segHighlightedClassIndex === c.index ? " seg-class-row-active" : "";
       return `
-        <line x1="${marginLeft}" y1="${y}" x2="${marginLeft + plotW}" y2="${y}" stroke="var(--line)" stroke-width="1" />
-        <text x="${marginLeft - 6}" y="${y}" text-anchor="end" dominant-baseline="middle" font-size="11" fill="var(--muted)">${t}</text>
-      `;
+        <div class="hbar-row seg-class-clickable${dim}${active}" data-class-index="${c.index}" title="${c.label}: ${n} sel (${pct}%)">
+          <span class="hbar-label">${c.label}</span>
+          <span class="hbar-track"><span class="hbar-fill" style="width:${(n / max) * 100}%;background:${c.color}"></span></span>
+          <span class="hbar-value">${n}</span>
+        </div>`;
     })
     .join("");
-
-  const barGap = 10;
-  const barW = (plotW - barGap * (n - 1)) / n;
-  const bars = segClassLabels
-    .map((c, i) => {
-      const count = counts[c.label] ?? 0;
-      const barH = (count / niceMax) * plotH;
-      const x = marginLeft + i * (barW + barGap);
-      const y = marginTop + plotH - barH;
-      const labelX = x + barW / 2;
-      const dimmed =
-        segHighlightedClassIndex !== null && segHighlightedClassIndex !== c.index ? ' opacity="0.35"' : "";
-      const active = segHighlightedClassIndex === c.index ? ' class="seg-class-bar-active"' : "";
-      return `
-        <g class="seg-class-chart-bar-group seg-class-clickable" data-class-index="${c.index}">
-          <rect x="${x}" y="${y}" width="${barW}" height="${Math.max(barH, 0)}" fill="${c.color}" rx="3"${dimmed}${active} />
-          <rect x="${x}" y="${marginTop}" width="${barW}" height="${plotH}" fill="transparent" />
-          ${count > 0 ? `<text x="${labelX}" y="${y - 4}" text-anchor="middle" font-size="11" font-weight="600" fill="var(--ink)">${count}</text>` : ""}
-          <text x="${labelX}" y="${marginTop + plotH + 14}" text-anchor="end" font-size="10" fill="var(--muted)" transform="rotate(-40 ${labelX} ${marginTop + plotH + 14})">${c.label}</text>
-        </g>
-      `;
-    })
-    .join("");
-
-  const axisLine = `<line x1="${marginLeft}" y1="${marginTop + plotH}" x2="${marginLeft + plotW}" y2="${marginTop + plotH}" stroke="var(--muted)" stroke-width="1.5" />`;
-
-  classChartBody.innerHTML = `<svg viewBox="0 0 ${chartW} ${chartH}" class="seg-class-chart-svg">${gridlines}${bars}${axisLine}</svg>`;
-
   classChartBody.querySelectorAll(".seg-class-clickable").forEach((el) => {
     el.addEventListener("click", () => toggleClassHighlight(parseInt(el.dataset.classIndex, 10)));
   });
@@ -1024,7 +970,7 @@ async function trySaveSegmentation(force) {
 
   if (data.needsConfirmation) {
     const lanjut = await showConfirmModal(
-      `Hasil ini sama persis (jumlah sel per kelas identik) dengan hasil tersimpan ` +
+      `Hasil ini sama persis (sel, kelas, dan penilaian dokter) dengan hasil tersimpan ` +
       `terakhir untuk gambar ini (${data.lastDetailFile}, ${data.lastTimestamp}).\n\n` +
       `Simpan lagi sebagai duplikat?`
     );
@@ -1242,8 +1188,11 @@ async function doSegBatchRun() {
     return;
   }
 
+  const ratingNote =
+    (selectData.unworthy ? `${selectData.unworthy} citra dinilai tidak layak oleh dokter dan akan dilewati. ` : "") +
+    (selectData.unrated ? `${selectData.unrated} citra belum dinilai di layar Penilaian citra (tetap diproses).` : "");
   const choice = await showChoiceModal(
-    `Ditemukan ${selectData.files.length} gambar di folder ini.\n\n` +
+    `Ditemukan ${selectData.files.length} gambar di folder ini.` + (ratingNote ? `\n\n${ratingNote}` : "") + `\n\n` +
     `Proses semua sekaligus? Hasilnya masih DUMMY/placeholder dan langsung ` +
     `tersimpan (JSON detail + segmentation_log.csv). Setelah selesai, semua ` +
     `hasilnya bisa dibuka satu-satu langsung dari daftar "Hasil di Folder ` +
@@ -1286,7 +1235,9 @@ async function doSegBatchRun() {
   // diproses (bukan cuma daftar hasil di bawah ini doang).
   segActiveFolder = selectData.folder;
   await loadSegResultsListForFolder(selectData.folder);
-  const skippedText = runData.totalSkipped ? `, ${runData.totalSkipped} dilewati (sudah ada)` : "";
+  const skippedText =
+    (runData.totalSkipped ? `, ${runData.totalSkipped} dilewati (sudah ada)` : "") +
+    (runData.totalUnworthy ? `, ${runData.totalUnworthy} dilewati (tidak layak)` : "");
   showToast(
     `${runData.totalImagesOk}/${runData.totalImages} gambar selesai diproses${skippedText} -- klik salah satu ` +
     `baris di bawah untuk mulai review/koreksi.`
@@ -1521,7 +1472,10 @@ function renderInspector() {
         <button type="button" class="btn btn-square" data-action="next" aria-label="Sel berikutnya">&rsaquo;</button>
       </div>
     </div>
-    <div class="muted small">Kelas dari model: <strong>${det.manual ? "tidak ada (sel manual)" : model ? model.label : "-"}</strong>, ${tags}</div>
+    <div class="cell-head">
+      <canvas id="cellCrop" class="cell-crop" width="144" height="144" role="img" aria-label="Potongan citra sel ${n}, diperbesar"></canvas>
+      <div class="muted small">Kelas dari model:<br /><strong>${det.manual ? "tidak ada (sel manual)" : model ? model.label : "-"}</strong><br />${tags}</div>
+    </div>
     <div class="class-grid" role="group" aria-label="Kelas sel">${classButtons}</div>
     <div class="verdict">
       <button type="button" class="btn verdict-ok" data-action="verdict" data-verdict="correct" aria-pressed="${det.doctorVerdict === "correct"}">Benar <kbd>B</kbd></button>
@@ -1529,6 +1483,39 @@ function renderInspector() {
       <button type="button" class="btn" data-action="delete" title="Hapus deteksi ini (Delete)">Hapus</button>
     </div>
     ${progress}`;
+  drawCellCrop(det);
+}
+
+// Potongan sel terpilih, diperbesar, dengan garis tepi sel berwarna kelas:
+// dokter bisa menilai bentuk sel tanpa memperbesar seluruh citra.
+let cropSourceImg = null;
+function drawCellCrop(det) {
+  const canvas = document.getElementById("cellCrop");
+  if (!canvas || !segCurrentImageDataUrl) return;
+  if (!cropSourceImg || cropSourceImg.dataset.src !== segCurrentImageDataUrl) {
+    cropSourceImg = new Image();
+    cropSourceImg.dataset.src = segCurrentImageDataUrl;
+    cropSourceImg.onload = () => renderInspector();
+    cropSourceImg.src = segCurrentImageDataUrl;
+    return;
+  }
+  if (!cropSourceImg.complete) return;
+  const [bx, by, bw, bh] = det.bbox;
+  const side = Math.max(bw, bh) * 1.6; // margin supaya sel tetangga dan latar ikut terlihat
+  const sx = bx + bw / 2 - side / 2;
+  const sy = by + bh / 2 - side / 2;
+  const ctx = canvas.getContext("2d");
+  const k = canvas.width / side;
+  ctx.fillStyle = "#000";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(cropSourceImg, sx, sy, side, side, 0, 0, canvas.width, canvas.height);
+  const color = segClassLabels[currentClassIndex(det)] ? segClassLabels[currentClassIndex(det)].color : "#fff";
+  ctx.beginPath();
+  det.mask.forEach(([x, y], i) => (i ? ctx.lineTo : ctx.moveTo).call(ctx, (x - sx) * k, (y - sy) * k));
+  ctx.closePath();
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = color;
+  ctx.stroke();
 }
 
 function handleInspectorClick(e) {

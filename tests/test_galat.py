@@ -127,5 +127,26 @@ class TestSesiDanPemulihan(unittest.TestCase):
         self.assertGreater(res["disk"]["free"], 0)
 
 
+
+class TestDuplikatReview(unittest.TestCase):
+    """Review dokter yang hanya menambah verdict bukan duplikat (bug sejak v0.1.0)."""
+
+    def test_verdict_baru_bukan_duplikat(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "ab_20261123-100000_01.png")
+            write_png(path, noisy_frame())
+            client = app.test_client()
+            dets = [{"id": 0, "classIndex": 0, "classLabel": "Normal cell", "confidence": 0.9,
+                     "bbox": [1, 1, 5, 5], "mask": [[1, 1], [5, 1], [5, 5]], "doctorVerdict": None}]
+            first = client.post("/api/segmentation/save", json={"path": path, "patientId": "ab", "detections": dets})
+            self.assertFalse(first.get_json().get("needsConfirmation"))
+            same = client.post("/api/segmentation/save", json={"path": path, "patientId": "ab", "detections": dets})
+            self.assertTrue(same.get_json()["needsConfirmation"])
+            dets[0]["doctorVerdict"] = "incorrect"
+            reviewed = client.post("/api/segmentation/save", json={"path": path, "patientId": "ab", "detections": dets})
+            self.assertFalse(reviewed.get_json().get("needsConfirmation"))
+            self.assertFalse(reviewed.get_json()["isDuplicate"])
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -21,6 +21,12 @@ Target rilis 0.2.0: refactor backend tanpa mengubah perilaku (lihat `docs/refact
 - `/api/camera/status` menambah field `frozen` (stream beku: isi frame tidak berubah lebih dari 5 detik); UI menampilkan peringatan dengan tombol sambung ulang.
 - Tes baru `tests/test_galat.py` (7 tes).
 
+### Fixed (target 0.3.0)
+- Menyimpan review dokter yang hanya menambah verdict (tanpa mengubah kelas) dianggap "duplikat" dan bisa batal tersimpan bila pengguna menekan Batal. Cek duplikat kini membandingkan isi deteksi lengkap dengan file tersimpan terakhir (ada sejak v0.1.0).
+- Spasi saat modal konfirmasi terbuka menekan tombol yang disorot (mis. "tetap simpan" citra buram). Kini Spasi diabaikan di modal, Enter memilih, Esc membatalkan.
+- "Kirim ke analisis" tetap aktif setelah capture baru yang belum disimpan dan mengirim citra lama. Kini dimatikan sampai citra baru disimpan.
+- Grafik jumlah per kelas tidak terbaca di panel sempit (SVG 820 px diperkecil). Diganti batang horizontal dengan label dan angka biasa.
+
 ### Added (target 0.3.0)
 - Capture otomatis tingkat 1 (UC-13): setelan di toolbar Akuisisi (default mati). Aplikasi memotret dan menyimpan sendiri saat frame lolos gerbang berurutan: ada sel, meja diam, lapang baru (bukan duplikat citra tersimpan terakhir), fokus di puncak dan baik. Daftar gerbang tampil di atas stream; citra otomatis ditandai "O" di riwayat. CLIP mode bayangan (dicatat, tidak memblokir). Ambang di `config.py` (`AUTO_*`), masih heuristik.
 - Kolom `capture_mode` di `capture_log.csv` (`manual` / `otomatis-1`), dengan migrasi otomatis log lama. Daftar kolom di `tests/test_v010.py` ikut ditambah (perubahan format yang disengaja, bukan perekaman ulang snapshot).
@@ -29,6 +35,10 @@ Target rilis 0.2.0: refactor backend tanpa mengubah perilaku (lihat `docs/refact
 - Penjaga penyimpanan (F11): sisa ruang folder simpan di bar status, peringatan di bawah 2 GB.
 - Sesi pasien (UC-01): inisial, folder, resolusi, dan kamera diingat dan dipulihkan saat halaman dibuka lagi; bar sesi menyebut jumlah citra pasien itu yang sudah ada di folder.
 - Pemulihan (UC-10): citra yang belum disimpan disalin ke `recovery/` dan ditawarkan untuk dipulihkan setelah aplikasi tertutup; draf koreksi segmentasi yang belum disimpan juga ditawarkan untuk dilanjutkan.
+- Lembar penilaian citra oleh dokter (F14): layar 2 "Penilaian citra" (urutan kerja kini Akuisisi, Penilaian citra, Analisis sel). Citra tampil penuh dengan ID acak, tanpa nama file dan skor; Layak/Tidak layak (L/T), alasan wajib bila tidak layak (1-6), catatan opsional, Sebelumnya. Hasil di `penilaian_citra.csv`, peta ID di `penilaian_citra_id.json` (folder citra). Modul `rating.py`.
+- "Proses satu folder" melewati citra yang dinilai tidak layak oleh salah satu penilai; konfirmasi menyebut jumlah tidak layak dan yang belum dinilai.
+- Peta fokus di atas stream (Tampilan > Peta fokus), semi-transparan, mengikuti posisi gambar.
+- Inspektur sel menampilkan potongan sel terpilih yang diperbesar dengan garis tepi berwarna kelas.
 - Rute baru `/api/system/status`, `/api/recovery/capture`, `/api/segmentation/open-path`. Tes rute kini menerima rute tambahan yang tercatat eksplisit; rute v0.1.0 tetap dibandingkan dengan snapshot.
 - `static/js/app.js` dipecah apa adanya menjadi `common.js`, `capture.js`, `segmentation.js`, `main.js`. Backend tidak berubah.
 

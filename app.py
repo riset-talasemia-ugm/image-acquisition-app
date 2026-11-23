@@ -13,6 +13,8 @@ Isi aplikasi ada di modul lain:
     capture.py       blueprint capture_bp: kamera, capture, fokus, simpan
     utils.py         helper bersama (safe_slug, frame_to_png_base64)
     segmentation/    blueprint segmentation_bp: segmentasi, export, konfigurasi model
+    rating.py        blueprint rating_bp: lembar penilaian citra oleh dokter (F14)
+    autocapture.py   gerbang capture otomatis tingkat 1 (UC-13)
 """
 
 import os
@@ -20,11 +22,13 @@ import os
 from flask import Flask, render_template
 
 from capture import capture_bp
+from rating import rating_bp
 from segmentation import segmentation_bp
 
 app = Flask(__name__)
 app.register_blueprint(capture_bp)
 app.register_blueprint(segmentation_bp)
+app.register_blueprint(rating_bp)
 
 
 # ---------------------------------------------------------------------------

@@ -221,7 +221,7 @@ Perubahan data yang dibutuhkan (dikerjakan setelah v0.2.0):
 | F11 | Penjaga ruang penyimpanan | |
 | F12 | Panduan dan troubleshooting di dalam aplikasi | |
 | F13 | Riwayat kunjungan pasien | |
-| F14 | Lembar penilaian kualitas citra oleh dokter | Untuk kalibrasi gerbang CLIP (UC-13) |
+| F14 | Lembar penilaian kualitas citra oleh dokter | Untuk kalibrasi gerbang CLIP (UC-13). Dibuat 2026-11-23 sebagai layar 2, **sebelum** analisis (permintaan pengguna): citra tidak layak dilewati saat segmentasi batch. Citra dianggap tidak layak bila penilaian terakhir salah satu penilai "tidak". |
 | F15 | File Excel perbandingan sistem dan dokter | Dibuat sesudah review dokter, lihat bagian 5 |
 
 Juga disetujui sebelumnya: review jarak jauh (UC-05), laporan pasien PDF (UC-07), statistik Excel (UC-08), dan pemulihan sesi (UC-10).

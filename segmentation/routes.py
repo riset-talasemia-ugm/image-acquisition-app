@@ -22,6 +22,7 @@ from config import (
 from csvlog import _ensure_log_columns, segmentation_log_lock
 from segmentation import segmentation_bp
 from segmentation.mock_model import generate_mock_instance_segmentation
+from rating import rating_summary
 from segmentation.storage import _latest_segmentation_rows, _load_model_config, _load_segmentation_detail_file
 from utils import frame_to_png_base64
 
@@ -290,14 +291,26 @@ def api_segmentation_save():
         is_duplicate = False
         duplicate_of = ""
         if prev_row is not None:
+            # Duplikat = isi deteksi persis sama dengan hasil tersimpan terakhir
+            # (sel, kelas koreksi, DAN penilaian dokter). Dulu hanya jumlah per
+            # kelas yang dibandingkan, sehingga review dokter yang hanya menambah
+            # verdict dianggap duplikat dan bisa batal tersimpan.
             try:
-                prev_total = int(prev_row.get("total_cells") or 0)
-                counts_match = all(
-                    int(prev_row.get(label) or 0) == class_counts[label] for label in RBC_CLASS_LABELS
-                )
-                is_duplicate = counts_match and prev_total == len(detections)
-            except (TypeError, ValueError):
-                is_duplicate = False
+                with open(os.path.join(folder, prev_row.get("detail_file") or ""), encoding="utf-8") as f:
+                    is_duplicate = json.load(f).get("detections") == detections
+            except (OSError, ValueError):
+                try:
+                    prev_total = int(prev_row.get("total_cells") or 0)
+                    counts_match = all(
+                        int(prev_row.get(label) or 0) == class_counts[label] for label in RBC_CLASS_LABELS
+                    )
+                    verdicts_match = (
+                        int(prev_row.get("doctor_correct_count") or 0) == doctor_correct_count
+                        and int(prev_row.get("doctor_incorrect_count") or 0) == doctor_incorrect_count
+                    )
+                    is_duplicate = counts_match and verdicts_match and prev_total == len(detections)
+                except (TypeError, ValueError):
+                    is_duplicate = False
             if is_duplicate:
                 duplicate_of = prev_row.get("detail_file") or ""
 
@@ -400,7 +413,13 @@ def api_segmentation_batch_select():
     except OSError as e:
         return jsonify({"ok": False, "message": f"Gagal membaca isi folder: {e}"}), 400
 
-    return jsonify({"ok": True, "folder": result["path"], "files": files})
+    unworthy, rated = rating_summary(result["path"])
+    return jsonify({
+        "ok": True, "folder": result["path"], "files": files,
+        # Penilaian citra (F14) dilakukan sebelum analisis; citra tidak layak dilewati.
+        "unworthy": sum(1 for f in files if f in unworthy),
+        "unrated": sum(1 for f in files if f not in rated),
+    })
 
 
 @segmentation_bp.route("/api/segmentation/batch-run", methods=["POST"])
@@ -417,6 +436,7 @@ def api_segmentation_batch_run():
     folder = (data.get("folder") or "").strip()
     patient_id = (data.get("patientId") or "").strip()
     skip_existing = bool(data.get("skipExisting"))
+    skip_unworthy = data.get("skipUnworthy", True)  # bawaan: lewati citra yang dinilai tidak layak
     if not folder or not os.path.isdir(folder):
         return jsonify({"ok": False, "message": "Folder tidak valid."}), 400
 
@@ -431,6 +451,7 @@ def api_segmentation_batch_run():
     grand_total_counts = {label: 0 for label in RBC_CLASS_LABELS}
     per_image_results = []
     already_processed = set()
+    unworthy = rating_summary(folder)[0] if skip_unworthy else set()
 
     with segmentation_log_lock:
         log_path = os.path.join(folder, SEGMENTATION_LOG_FILENAME)
@@ -448,6 +469,12 @@ def api_segmentation_batch_run():
                 pass
 
         for fname in files:
+            if fname in unworthy:
+                per_image_results.append({
+                    "filename": fname, "ok": True, "skipped": True, "unworthy": True,
+                    "message": "Dilewati -- dinilai tidak layak oleh dokter.",
+                })
+                continue
             if skip_existing and fname in already_processed:
                 per_image_results.append({
                     "filename": fname, "ok": True, "skipped": True,
@@ -522,7 +549,8 @@ def api_segmentation_batch_run():
                 "detailFile": detail_filename,
             })
 
-    total_skipped = sum(1 for r in per_image_results if r.get("skipped"))
+    total_unworthy = sum(1 for r in per_image_results if r.get("unworthy"))
+    total_skipped = sum(1 for r in per_image_results if r.get("skipped")) - total_unworthy
     total_processed = sum(1 for r in per_image_results if r["ok"] and not r.get("skipped"))
     return jsonify({
         "ok": True,
@@ -531,11 +559,13 @@ def api_segmentation_batch_run():
         "totalImages": len(files),
         "totalImagesOk": sum(1 for r in per_image_results if r["ok"]),
         "totalSkipped": total_skipped,
+        "totalUnworthy": total_unworthy,
         "grandTotalCounts": grand_total_counts,
         "perImage": per_image_results,
         "message": (
             f"Batch selesai (hasil DUMMY/placeholder) -- {total_processed} gambar diproses"
             + (f", {total_skipped} dilewati (sudah ada)" if total_skipped else "")
+            + (f", {total_unworthy} dilewati (tidak layak)" if total_unworthy else "")
             + ". Model instance segmentation beneran belum dilatih."
         ),
     })

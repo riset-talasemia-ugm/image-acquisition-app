@@ -152,6 +152,7 @@ function handleCameraDisconnected() {
   if (btnCameraSettings) btnCameraSettings.disabled = true;
   focusCard.classList.add("focus-card-hidden");
   streamChip.classList.add("view-hidden");
+  focusOverlay.classList.add("view-hidden");
   updateSaveButtonState();
   showError(
     "Koneksi ke kamera terputus. Cek kabel USB kamera, lalu sambungkan ulang.",
@@ -266,6 +267,7 @@ function relToColor(rel) {
 }
 
 function renderFocusMap(q) {
+  renderFocusOverlay(q);
   if (!q || !q.valid) return;
   if (focusMapKey !== `${q.rows}x${q.cols}`) buildFocusMap(q.rows, q.cols);
   const cells = focusMap.children;
@@ -296,6 +298,43 @@ function renderFocusMap(q) {
 // bawah ambang). Petunjuk satu-frame saja, tidak mengubah status fokus: status
 // hanya menilai setelan fokus relatif terhadap puncak tiap tile, jadi pinggir
 // yang buram bawaan tidak terlihat olehnya.
+const focusOverlay = document.getElementById("focusOverlay");
+const focusOverlayToggle = document.getElementById("focusOverlayToggle");
+
+function renderFocusOverlay(q) {
+  const img = streamBody.querySelector("img");
+  if (!focusOverlayToggle.checked || !img || !q || !q.valid || !isCameraConnected) {
+    focusOverlay.classList.add("view-hidden");
+    return;
+  }
+  const wrap = focusOverlay.parentElement.getBoundingClientRect();
+  const box = img.getBoundingClientRect();
+  Object.assign(focusOverlay.style, {
+    left: box.left - wrap.left + "px",
+    top: box.top - wrap.top + "px",
+    width: box.width + "px",
+    height: box.height + "px",
+    gridTemplateColumns: `repeat(${q.cols}, 1fr)`,
+    gridTemplateRows: `repeat(${q.rows}, 1fr)`,
+  });
+  let cells = "";
+  for (let r = 0; r < q.rows; r++) {
+    for (let c = 0; c < q.cols; c++) {
+      const raw = q.tiles[r][c];
+      const rel = q.tilesRel[r][c];
+      let bg = "transparent"; // tile kosong (tanpa sel) tidak dinilai
+      if (raw !== null && (!q.confirmed || rel === null)) bg = "rgba(255, 255, 255, 0.12)";
+      else if (raw !== null) {
+        const t = Math.max(0, Math.min(1, (rel - 0.4) / 0.6));
+        bg = `hsla(${Math.round(t * 120)}, 65%, 48%, 0.38)`;
+      }
+      cells += `<span style="background:${bg}"></span>`;
+    }
+  }
+  focusOverlay.innerHTML = cells;
+  focusOverlay.classList.remove("view-hidden");
+}
+
 function edgeWarnText(q) {
   return (
     `Pinggir frame lebih lemah dari tengah (tepi/tengah ${q.edgeRatio.toFixed(2)}). ` +
@@ -608,6 +647,9 @@ async function doCapture() {
     return;
   }
   hideError("capture");
+  // "Kirim ke analisis" mengirim citra tersimpan terakhir; begitu ada capture
+  // baru yang belum disimpan, matikan supaya yang terkirim tidak tertukar.
+  btnSendToSegmentation.disabled = true;
   captureBody.innerHTML = `<img src="data:image/png;base64,${data.image}" alt="hasil capture" />`;
   captureBadge.textContent = "Belum Tersimpan";
   captureBadge.className = "badge badge-unsaved";

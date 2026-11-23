@@ -161,6 +161,8 @@ class TestRoutes(Base):
         # sesudahnya harus tercatat di sini (dan di docs/refactor/01, bagian
         # "Perubahan kontrak sesudah v0.1.0"), supaya tidak bertambah diam-diam.
         added = {
+            "/api/rating/next POST",
+            "/api/rating/submit POST",
             "/api/recovery/capture GET,POST",
             "/api/segmentation/open-path POST",
             "/api/system/status GET",

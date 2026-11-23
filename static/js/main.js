@@ -1,6 +1,25 @@
 // Pendaftaran event dan inisialisasi. Dimuat paling akhir.
 tabCapture.addEventListener("click", () => switchTab("capture"));
 tabSegmentation.addEventListener("click", () => switchTab("segmentation"));
+tabRating.addEventListener("click", () => switchTab("rating"));
+
+ratingRater.value = localStorage.getItem("adt-rater") || "";
+ratingRater.addEventListener("change", () => {
+  localStorage.setItem("adt-rater", ratingRater.value.trim());
+  ratingHistory.length = 0;
+  loadRatingItem();
+});
+document.getElementById("btnRatingFolder").addEventListener("click", selectRatingFolder);
+btnRateOk.addEventListener("click", () => setRatingVerdict("layak"));
+btnRateBad.addEventListener("click", () => setRatingVerdict("tidak"));
+ratingReasons.addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-reason]");
+  if (btn) toggleRatingReason(btn.dataset.reason);
+});
+btnRateNext.addEventListener("click", submitRating);
+btnRatePrev.addEventListener("click", () => {
+  if (ratingHistory.length) loadRatingItem(ratingHistory.pop());
+});
 btnSegSelectImage.addEventListener("click", doSelectSegmentationImage);
 btnLoadSegmentation.addEventListener("click", doLoadSegmentationResult);
 btnRunSegmentation.addEventListener("click", doRunSegmentation);
@@ -58,6 +77,10 @@ patientNameInput.addEventListener("input", () => {
 });
 resolutionSelect.addEventListener("change", saveSession);
 autoToggle.addEventListener("change", () => setAutoMode(autoToggle.checked));
+focusOverlayToggle.addEventListener("change", () => {
+  if (!focusOverlayToggle.checked) focusOverlay.classList.add("view-hidden");
+  else focusLiveToggle.checked = true; // overlay diperbarui lewat poll fokus live
+});
 
 document.getElementById("btnTheme").addEventListener("click", toggleTheme);
 document.getElementById("btnOpenSettings").addEventListener("click", () =>

@@ -10,7 +10,7 @@ Status: dikerjakan di branch `feat/ui-v0.3.0` (dibuat dari `refactor/v0.2.0`, 20
 - Semua fitur v0.1.0 tetap ada (inventaris di bagian 3).
 
 Tidak dikerjakan di v0.3.0 karena butuh backend baru (urutan menyusul, lihat `docs/use-case.md`):
-- layar Sesi pasien, Laporan pasien, Penilaian citra, Akuisisi otomatis (Pindai);
+- layar Sesi pasien terpisah, Akuisisi otomatis bermotor (Pindai). Penilaian citra sudah dibuat (layar 2, sebelum Analisis sel); Laporan pasien dibuat sebagai halaman cetak;
 - capture otomatis tingkat 2-3 (bermotor); beberapa citra belum tersimpan sekaligus (K-A3; sebagai gantinya Ambil citra bertanya dulu bila ada citra belum tersimpan), sisa penyimpanan, perkiraan jumlah eritrosit per pasien;
 - mode label "Ukuran, bentuk, warna" (butuh field `attributes`, lihat `use-case.md` bagian 7);
 - login/nama pengguna di header.

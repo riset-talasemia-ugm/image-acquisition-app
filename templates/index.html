@@ -22,8 +22,12 @@
             <span class="step-n">1</span>
             <span class="step-text"><strong>Akuisisi</strong><small>Ambil dan simpan citra</small></span>
           </button>
-          <button type="button" id="tabSegmentation" class="step">
+          <button type="button" id="tabRating" class="step">
             <span class="step-n">2</span>
+            <span class="step-text"><strong>Penilaian citra</strong><small>Saring layak, sebelum analisis</small></span>
+          </button>
+          <button type="button" id="tabSegmentation" class="step">
+            <span class="step-n">3</span>
             <span class="step-text"><strong>Analisis sel</strong><small>Segmentasi dan review dokter</small></span>
           </button>
         </nav>
@@ -92,6 +96,12 @@
                 {% endif %}
               </div>
               <div class="group">
+                <span class="group-label">Tampilan</span>
+                <label class="switch-label" title="Tumpuk peta ketajaman per tile di atas stream: hijau = dekat puncak fokus tile itu, merah = jauh">
+                  <input type="checkbox" id="focusOverlayToggle" /> Peta fokus
+                </label>
+              </div>
+              <div class="group">
                 <span class="group-label">Mode</span>
                 <label class="switch-label" title="Memotret dan menyimpan sendiri saat lapang lolos semua pemeriksaan. Anda tetap menggeser meja dan memutar fokus.">
                   <input type="checkbox" id="autoToggle" /> Capture otomatis
@@ -102,6 +112,7 @@
             <div class="specimen" id="streamBody">
               <span class="placeholder-text">Kamera belum terhubung.<br />Pilih kamera di atas, lalu tekan Hubungkan.</span>
             </div>
+            <div id="focusOverlay" class="focus-overlay view-hidden" aria-hidden="true"></div>
             <div id="streamChip" class="stream-chip view-hidden" aria-live="polite"></div>
             <div id="autoPanel" class="auto-panel view-hidden" aria-live="polite">
               <div id="autoTitle" class="auto-title"></div>
@@ -173,7 +184,7 @@
       </div>
 
       <!-- ================================================================ -->
-      <!-- Layar 2: Analisis sel                                              -->
+      <!-- Layar 3: Analisis sel                                              -->
       <!-- ================================================================ -->
       <div id="segmentationView" class="view view-hidden">
         <div class="model-note" role="note">
@@ -290,6 +301,57 @@
         </main>
       </div>
 
+      <!-- ================================================================ -->
+      <!-- Layar 2: Penilaian citra oleh dokter (F14), sebelum analisis                         -->
+      <!-- ================================================================ -->
+      <div id="ratingView" class="view view-hidden">
+        <section class="session-bar" aria-label="Penilai dan folder">
+          <label class="field" for="ratingRater">
+            <span>Nama penilai</span>
+            <input id="ratingRater" type="text" autocomplete="off" placeholder="mis. dr. A" />
+          </label>
+          <button id="btnRatingFolder" type="button" class="btn">Pilih folder citra</button>
+          <span id="ratingFolderPath" class="path-text">Belum dipilih</span>
+          <div class="rating-progress">
+            <div class="focus-bar"><div id="ratingBarFill" class="focus-bar-fill review-fill"></div></div>
+            <span id="ratingProgress" class="muted small"></span>
+          </div>
+        </section>
+        <main class="capture-main">
+          <section class="stage" aria-label="Citra yang dinilai">
+            <div class="toolbar">
+              <span>Citra <strong id="ratingId">-</strong></span>
+              <span class="muted small">Citra penuh, termasuk pinggir. Ketuk citra untuk zoom 100%.</span>
+            </div>
+            <div class="specimen rating-image" id="ratingImageBody">
+              <span class="placeholder-text">Isi nama penilai dan pilih folder citra untuk mulai.</span>
+            </div>
+          </section>
+          <aside class="side" aria-label="Penilaian">
+            <section class="card">
+              <h2 class="rating-question">Apakah lapang pandang ini layak untuk dianotasi?</h2>
+              <div class="verdict verdict-2">
+                <button type="button" id="btnRateOk" class="btn verdict-ok" aria-pressed="false">Layak <kbd>L</kbd></button>
+                <button type="button" id="btnRateBad" class="btn verdict-bad" aria-pressed="false">Tidak layak <kbd>T</kbd></button>
+              </div>
+              <fieldset id="ratingReasons" class="reasons view-hidden">
+                <legend class="muted small">Alasan, boleh lebih dari satu</legend>
+              </fieldset>
+              <label class="field field-stack" for="ratingNote">
+                <span>Catatan, opsional</span>
+                <textarea id="ratingNote" rows="2"></textarea>
+              </label>
+              <p class="muted small">Nama file, identitas pasien, dan skor otomatis disembunyikan supaya penilaian tidak bias. Citra tidak layak dilewati saat "Proses satu folder" di Analisis sel, dan penilaian ini dipakai untuk menyetel capture otomatis.</p>
+            </section>
+            <div class="rating-nav">
+              <button type="button" id="btnRatePrev" class="btn" disabled>Sebelumnya</button>
+              <button type="button" id="btnRateNext" class="btn btn-primary" disabled>Simpan dan berikutnya <kbd>Enter</kbd></button>
+            </div>
+            <span id="ratingHint" class="muted small"></span>
+          </aside>
+        </main>
+      </div>
+
       <footer class="status-bar">
         <span class="status-item"><span id="cameraDot" class="dot dot-off"></span><span id="cameraLabel">Kamera belum terhubung</span></span>
         <span id="statusModel" class="status-item status-warn">Model: memuat status...</span>
@@ -381,6 +443,7 @@
     <script src="{{ url_for('static', filename='js/common.js') }}"></script>
     <script src="{{ url_for('static', filename='js/capture.js') }}"></script>
     <script src="{{ url_for('static', filename='js/segmentation.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/rating.js') }}"></script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
   </body>
 </html>

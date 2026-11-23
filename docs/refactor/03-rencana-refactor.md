@@ -2,7 +2,13 @@
 
 ## 1. Tujuan dan kriteria selesai
 
-**Tujuan:** memecah monolith (lihat `02-arsitektur.md`) supaya fitur berikutnya, terutama model segmentasi sungguhan, lebih mudah ditambahkan, **tanpa mengubah perilaku sedikit pun** (lihat `01-spesifikasi-v0.1.0.md`).
+**Tujuan:** memecah monolith (lihat `02-arsitektur.md`) **tanpa mengubah perilaku sedikit pun** (lihat `01-spesifikasi-v0.1.0.md`). Alasannya, dikonfirmasi pengguna pada 2026-11-23:
+1. Model segmentasi sungguhan akan dipasang, jadi bagian inferensi harus terpisah rapi (`segmentation/mock_model.py`).
+2. File terlalu besar sehingga susah dibaca dan diedit, baik oleh manusia maupun AI.
+3. Akan ada orang lain yang ikut mengerjakan, jadi perlu README developer dan pembagian modul yang jelas.
+4. Aplikasi akan dijalankan di Jetson/perangkat lain, jadi kinerja dan kamera harus diuji di sana.
+5. Menambah fitur sering memunculkan bug, jadi tes harus dibuat lebih dulu.
+6. UI/UX akan dirombak. Perombakan ini **bukan** bagian dari refactor: dikerjakan di v0.3.0 setelah v0.2.0, di atas frontend yang sudah dipecah (lihat `docs/ui/`).
 
 Refactor dianggap selesai kalau:
 1. Semua tes otomatis di `tests/` lulus, dengan hasil sama seperti di v0.1.0.
@@ -81,4 +87,7 @@ Data di folder akuisisi tidak ikut terpengaruh, karena refactor tidak mengubah f
 
 Catat di sini bug atau ide yang ditemukan selama refactor, jangan langsung diperbaiki.
 
-- (kosong)
+- `doCapture` langsung mengganti citra aktif, dan server menimpa `captured_frame` tanpa peringatan. Spasi yang tertekan tidak sengaja sebelum Simpan membuat citra hilang tanpa jejak (K-A3). Ditemukan di skenario lama.
+- `fetch` di `doCapture`/`doSave` tidak dibungkus `try/catch`. Kalau server mati, UI diam tanpa pesan (K-C5).
+- `/api/save` hanya mengembalikan "Gagal menyimpan file." tanpa penyebab, karena `cv2.imwrite` tidak memberi alasan (K-C2).
+- Penghitung "Jumlah gambar tercapture" menampilkan nomor iterasi terakhir dari file, bukan jumlah sesi (K-A5).

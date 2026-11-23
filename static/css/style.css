@@ -676,3 +676,5 @@ input::placeholder { color: var(--muted); opacity: 0.8; }
   .gallery-item img { height: 44px; }
   .gallery-label { display: none; }
 }
+.review-progress { display: flex; flex-direction: column; gap: 6px; }
+.review-progress .focus-bar { margin: 0; }

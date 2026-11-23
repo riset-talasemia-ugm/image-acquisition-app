@@ -476,7 +476,15 @@ function setActiveCell(cellId) {
     });
   }
   const activeRow = segDetectionsBody.querySelector(`.seg-detection-row[data-cell-id="${cellId}"]`);
-  if (activeRow) activeRow.scrollIntoView({ block: "nearest" });
+  // Gulir daftar sel saja (bukan panel kanan), supaya inspektur sel tetap di
+  // tempatnya saat pilihan pindah otomatis setelah verdict.
+  if (activeRow) {
+    const r = activeRow.getBoundingClientRect();
+    const box = segDetectionsBody.getBoundingClientRect();
+    if (r.top < box.top || r.bottom > box.bottom) {
+      segDetectionsBody.scrollTop += r.top - box.top - (box.height - r.height) / 2;
+    }
+  }
   updateCellSizeButtonsState();
   renderInspector();
 }
@@ -1378,9 +1386,15 @@ function setDetClass(det, idx) {
 }
 
 // Tekan verdict yang sama dua kali = batal (sama dengan tombol di daftar sel).
-function setDetVerdict(det, verdict) {
+// Dari inspektur dan shortcut B/S, pilihan langsung pindah ke sel berikutnya
+// supaya dokter cukup menekan S, S, B, ... tanpa memilih sel satu per satu.
+// Kalau verdict dibatalkan, pilihan tetap di sel itu.
+function setDetVerdict(det, verdict, advance = true) {
   det.doctorVerdict = det.doctorVerdict === verdict ? null : verdict;
   renderDetectionsList();
+  if (!advance || !det.doctorVerdict) return;
+  const next = segDetections[segDetections.indexOf(det) + 1];
+  if (next) setActiveCell(next.id);
 }
 
 function renderInspector() {
@@ -1391,6 +1405,7 @@ function renderInspector() {
     <div class="review-progress">
       <div class="review-progress-text"><span>Direview</span><strong>${reviewed} dari ${total}</strong></div>
       <div class="focus-bar"><div class="focus-bar-fill review-fill" style="width:${pct}%"></div></div>
+      ${total && reviewed < total ? '<button type="button" class="btn btn-block" data-action="rest" title="Tandai semua sel yang belum direview sebagai Benar">Tandai sisanya benar</button>' : ""}
     </div>`;
   const det = segDetections.find((d) => d.id === segActiveCellId);
   if (!det) {
@@ -1438,6 +1453,10 @@ function renderInspector() {
 function handleInspectorClick(e) {
   const btn = e.target.closest("[data-action]");
   if (!btn) return;
+  if (btn.dataset.action === "rest") {
+    doSegMarkRestCorrect(); // tetap bisa dipakai walau belum ada sel terpilih
+    return;
+  }
   const det = segDetections.find((d) => d.id === segActiveCellId);
   if (!det) return;
   const action = btn.dataset.action;

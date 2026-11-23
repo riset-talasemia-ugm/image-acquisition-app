@@ -57,7 +57,7 @@ Script klasik tanpa build step; urutan muat = urutan tabel. Logika dari `app.js`
 | Gambar sumber / hasil segmentasi, zoom, pan | Tengah, toolbar di atasnya |
 | Tambah sel, ukuran sel, nomor sel | Toolbar gambar, kelompok "Alat" dan "Tampilan" |
 | Daftar sel, verdict, koreksi kelas, hapus, pilih massal, Tandai sisanya benar | Panel kanan, ditambah **inspektur sel** (tombol kelas besar untuk layar sentuh) |
-| Shortcut 0-9, Delete, panah, +/- | Tetap; tambahan B (Benar) dan S (Salah) |
+| Shortcut 0-9, Delete, panah, +/- | Tetap; tambahan B (Benar) dan S (Salah). Verdict dari inspektur atau B/S langsung memilih sel berikutnya; "Tandai sisanya benar" juga ada di inspektur |
 | Hasil di folder + filter | Panel kiri, "Antrean citra" |
 | Ringkasan per kelas, tabel/grafik, sorot kelas | Panel kiri bawah |
 | Ringkasan per pasien, Export Excel, Export COCO | Dialog "Laporan dan export" |

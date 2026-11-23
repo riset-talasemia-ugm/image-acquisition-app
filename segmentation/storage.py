@@ -4,7 +4,10 @@ import csv
 import json
 import os
 
+import cv2
+
 from config import DEFAULT_LOW_CONFIDENCE_THRESHOLD, MODEL_CONFIG_PATH, SEGMENTATION_LOG_FILENAME
+from utils import frame_to_png_base64
 
 
 def _latest_segmentation_rows(folder):
@@ -58,3 +61,47 @@ def _load_model_config():
     except (TypeError, ValueError):
         config["lowConfidenceThreshold"] = DEFAULT_LOW_CONFIDENCE_THRESHOLD
     return config
+
+
+def _load_segmentation_detail_file(detail_path):
+    """Logic bersama buat baca satu file JSON hasil segmentasi + coba baca
+    ulang gambar sumbernya buat preview. Dipakai baik dari dialog
+    (/api/segmentation/load) maupun klik langsung di daftar hasil folder
+    (/api/segmentation/load-path, tanpa buka dialog lagi -- ini yang bikin
+    review banyak hasil sekaligus, mis. ~20 capture per pasien, nggak perlu
+    buka-tutup dialog file satu-satu)."""
+    try:
+        with open(detail_path, "r", encoding="utf-8") as f:
+            detail = json.load(f)
+    except (OSError, json.JSONDecodeError) as e:
+        return {"ok": False, "message": f"Gagal membaca file: {e}"}
+
+    source_image = detail.get("sourceImage")
+    detections = detail.get("detections") or []
+
+    response = {
+        "ok": True,
+        "path": source_image,
+        "detailFile": os.path.basename(detail_path),
+        "patientId": detail.get("patientId"),
+        "detections": detections,
+        "image": None,
+        "width": None,
+        "height": None,
+    }
+
+    if source_image and os.path.isfile(source_image):
+        frame = cv2.imread(source_image)
+        if frame is not None:
+            response["image"] = frame_to_png_base64(frame)
+            h, w = frame.shape[:2]
+            response["width"] = w
+            response["height"] = h
+
+    if response["image"] is None:
+        response["message"] = (
+            "Gambar sumber asli tidak ditemukan/gagal dibaca di lokasi "
+            "semula -- cuma daftar sel yang berhasil dimuat."
+        )
+
+    return response

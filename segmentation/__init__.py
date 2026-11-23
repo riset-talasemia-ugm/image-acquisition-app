@@ -8,4 +8,4 @@ from flask import Blueprint
 
 segmentation_bp = Blueprint("segmentation", __name__)
 
-from segmentation import export  # noqa: E402,F401  (mendaftarkan route)
+from segmentation import export, routes  # noqa: E402,F401  (mendaftarkan route)

@@ -154,8 +154,13 @@ thalassemia-capture-app/
 ├── templates/
 │   └── index.html
 └── static/
-    ├── css/style.css
-    └── js/app.js
+    ├── css/style.css          # tema terang/gelap, tata letak dua layar
+    ├── fonts/                 # Atkinson Hyperlegible (OFL), tanpa CDN
+    └── js/
+        ├── common.js          # toast, modal, tema, pindah layar
+        ├── capture.js         # layar Akuisisi
+        ├── segmentation.js    # layar Analisis sel
+        └── main.js            # event dan inisialisasi (dimuat terakhir)
 ```
 
 ## Troubleshooting

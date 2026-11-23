@@ -40,7 +40,7 @@ Dari audit kode:
 - Capture sampai simpan satu citra: [ISI: target, ukur dulu di UI lama].
 - Review satu gambar (~[ISI] sel) oleh dokter: [ISI: target].
 - Operator baru bisa menyelesaikan satu sesi capture tanpa dijelaskan.
-- Tidak ada fitur yang hilang (cek inventaris di `02-audit-dan-alur.md`).
+- Tidak ada fitur yang hilang (cek inventaris di `02-rencana-v0.3.0.md`).
 
 ## 4. Batasan tetap
 

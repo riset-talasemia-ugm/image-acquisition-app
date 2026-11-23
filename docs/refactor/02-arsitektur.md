@@ -5,7 +5,7 @@
 > - `utils.py` ditambahkan untuk `safe_slug` dan `frame_to_png_base64`, yang dipakai capture dan segmentasi;
 > - `segmentation/routes.py` 660 baris, sedikit di atas patokan.
 >
-> Frontend (bagian 2.2) tidak dikerjakan di v0.2.0, karena ditulis ulang di v0.3.0.
+> Frontend (bagian 2.2) tidak dikerjakan di v0.2.0, karena ditulis ulang di v0.3.0. Struktur frontend v0.3.0 yang dipakai (lebih sederhana dari bagian 2.2: empat file JS, satu CSS) ada di `docs/ui/02-rencana-v0.3.0.md`.
 
 ## 1. Kondisi sekarang (v0.1.0)
 

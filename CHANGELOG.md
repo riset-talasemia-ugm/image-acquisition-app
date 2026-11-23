@@ -10,6 +10,12 @@ Target rilis 0.2.0: refactor backend tanpa mengubah perilaku (lihat `docs/refact
 - `app.py` (2.383 baris) dipecah menjadi `config.py`, `csvlog.py`, `quality.py`, `camera.py`, `capture.py` (blueprint `capture_bp`), `utils.py`, dan paket `segmentation/` (blueprint `segmentation_bp`: `mock_model.py`, `storage.py`, `routes.py`, `export.py`). `app.py` tinggal 42 baris.
 - Kode dipindah apa adanya: 90 definisi top-level v0.1.0 ada dengan teks identik, 29 route dengan URL, method, dan fungsi yang sama.
 
+### Changed (UI, branch `feat/ui-v0.3.0`, target 0.3.0)
+- Tampilan ditulis ulang mengikuti prototipe (`docs/ui/`): dua layar (Akuisisi, Analisis sel) dengan navigasi tahap, bar sesi, bar status, tema terang/gelap, font Atkinson Hyperlegible offline, tanpa scroll halaman.
+- Akuisisi: status fokus juga tampil di atas stream, tanda prasyarat (kamera, inisial, folder), alasan tombol Simpan mati ditulis.
+- Analisis: inspektur sel dengan tombol kelas dan verdict besar untuk layar sentuh, shortcut B (Benar) dan S (Salah), banner "alat bantu, bukan diagnosis" dan status model mock yang mencolok. Laporan/export dan pengaturan model pindah ke dialog.
+- `static/js/app.js` dipecah apa adanya menjadi `common.js`, `capture.js`, `segmentation.js`, `main.js`. Backend tidak berubah.
+
 ### Added
 - Tes karakterisasi `tests/test_v010.py` (14 tes) dengan acuan `tests/expected_v0.1.0.json`, termasuk data akuisisi lama di `tmp/data-uji/` (tidak di-commit).
 

@@ -32,6 +32,16 @@ Ditulis di Fase 0, terhadap v0.1.0. Tes ini **tidak boleh diubah** selama refact
 
 Acuan tes 2.9 berasal dari data pasien, jadi disimpan di `tmp/data-uji/expected.json` dan tidak di-commit. Rekam acuan ini dengan `RECORD_EXPECTED=1` sambil checkout `v0.1.0`, sebelum kode refactor menyentuh folder itu.
 
+Isi `tmp/data-uji/` (disalin 2026-11-23 dari folder induk; data asli tidak diubah):
+
+| Folder | Asal | Yang diuji |
+|---|---|---|
+| `capture-baru-02-10` | `data-hasil-akuisisi/02-10` | `capture_log.csv` format baru (kolom tile dan CLIP), 7 citra |
+| `seg-lama-TRA` | `data-saat-development-no-need/TRA` | `capture_log.csv` 7 kolom dan `segmentation_log.csv` tanpa `is_duplicate` |
+| `seg-baru-jue` | `data-saat-development-no-need/jue` | `segmentation_log.csv` dengan `is_duplicate`, 3 pasien |
+
+Hanya tes 2.9 yang direkam (`RECORD_EXPECTED=1 venv\Scripts\python -m unittest tests.test_v010.TestDataLama`), supaya acuan utama tidak ikut terekam ulang.
+
 Yang tidak diuji otomatis: `CameraManager` dengan hardware, `/stream`, dialog tkinter (`select-folder`, `select-image`, `load`, `batch-select`), dan CLIP (model 600 MB).
 
 ## 3. Checklist manual

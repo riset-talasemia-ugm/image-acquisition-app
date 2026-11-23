@@ -1,19 +1,21 @@
 # Rencana Refactor v0.1.0 ke v0.2.0
 
+**Cakupan (diputuskan pengguna 2026-11-23): v0.2.0 hanya merefactor backend.** Frontend (`app.js`, `style.css`) tidak dipecah, karena akan ditulis ulang di v0.3.0 mengikuti prototipe UI. Memecah file yang akan diganti berarti kerja dua kali.
+
 ## 1. Tujuan dan kriteria selesai
 
-**Tujuan:** memecah monolith (lihat `02-arsitektur.md`) **tanpa mengubah perilaku sedikit pun** (lihat `01-spesifikasi-v0.1.0.md`). Alasannya, dikonfirmasi pengguna pada 2026-11-23:
+**Tujuan:** memecah backend monolith (lihat `02-arsitektur.md`) **tanpa mengubah perilaku sedikit pun** (lihat `01-spesifikasi-v0.1.0.md`). Alasannya, dikonfirmasi pengguna pada 2026-11-23:
 1. Model segmentasi sungguhan akan dipasang, jadi bagian inferensi harus terpisah rapi (`segmentation/mock_model.py`).
 2. File terlalu besar sehingga susah dibaca dan diedit, baik oleh manusia maupun AI.
 3. Akan ada orang lain yang ikut mengerjakan, jadi perlu README developer dan pembagian modul yang jelas.
 4. Aplikasi akan dijalankan di Jetson/perangkat lain, jadi kinerja dan kamera harus diuji di sana.
 5. Menambah fitur sering memunculkan bug, jadi tes harus dibuat lebih dulu.
-6. UI/UX akan dirombak. Perombakan ini **bukan** bagian dari refactor: dikerjakan di v0.3.0 setelah v0.2.0, di atas frontend yang sudah dipecah (lihat `docs/ui/`).
+6. UI/UX akan dirombak. Perombakan ini **bukan** bagian dari refactor: dikerjakan di v0.3.0 setelah v0.2.0. Frontend v0.3.0 langsung ditulis dalam struktur file baru (lihat `docs/ui/`).
 
 Refactor dianggap selesai kalau:
 1. Semua tes otomatis di `tests/` lulus, dengan hasil sama seperti di v0.1.0.
 2. Checklist manual di `04-rencana-uji.md` lulus di laptop pengembangan **dan** di laptop akuisisi dengan kamera asli.
-3. `app.py` tinggal berisi pembuatan app, pendaftaran blueprint, route `/`, dan `app.run()`. `static/js/app.js` dan `static/css/style.css` sudah dihapus.
+3. `app.py` tinggal berisi pembuatan app, pendaftaran blueprint, route `/`, dan `app.run()`. Frontend (`app.js`, `style.css`, `index.html`) tidak berubah dari v0.1.0.
 4. Data lama (folder berisi `capture_log.csv`, `segmentation_log.csv`, JSON detail dari v0.1.0) terbaca normal.
 
 ## 2. Aturan kerja
@@ -31,7 +33,7 @@ Refactor dianggap selesai kalau:
 2. Tag `v0.1.0` di `main`: `git tag -a v0.1.0 -m "Baseline sebelum refactor"`.
 3. Siapkan data uji di `tmp/data-uji/`: beberapa gambar capture asli, `capture_log.csv` format lama dan baru, JSON detail, dan `segmentation_log.csv`.
 4. Tulis tes karakterisasi (lihat `04-rencana-uji.md`, bagian 2) di atas v0.1.0, lalu pastikan lulus. **Tes ini wajib ada sebelum Fase 1.**
-5. Rekam acuan (`RECORD_EXPECTED=1`) ke `tests/expected_v0.1.0.json`, termasuk snapshot daftar route. Status: tes dan acuan sudah dibuat. Yang tersisa hanya data uji asli di langkah 3.
+5. Rekam acuan (`RECORD_EXPECTED=1`) ke `tests/expected_v0.1.0.json`, termasuk snapshot daftar route. Status (2026-11-23): selesai. Data uji asli disalin ke `tmp/data-uji/` (lihat `04-rencana-uji.md`), acuannya di `tmp/data-uji/expected.json`.
 
 ### Fase 1: Backend
 Urutannya dari bagian yang paling sedikit bergantung ke yang paling banyak. Setelah tiap langkah: jalankan tes, lalu commit.
@@ -48,16 +50,19 @@ Urutannya dari bagian yang paling sedikit bergantung ke yang paling banyak. Sete
 
 Kamera dipindah paling akhir karena paling sulit diuji otomatis dan butuh hardware. Setelah langkah 1.6 dan 1.7, jalankan checklist manual kamera.
 
-### Fase 2: Frontend JS
+### Fase 2 dan 3: dipindah ke v0.3.0
+Tidak dikerjakan di v0.2.0. Rencana lama di bawah hanya sebagai catatan; struktur frontend v0.3.0 diputuskan saat rombak UI.
+
+#### (Dipindah) Frontend JS
 1. Potong `app.js` menjadi 8 script klasik sesuai `02-arsitektur.md` 2.2, satu file per commit, dari atas ke bawah. Tiap commit menambah satu `<script defer>` di `index.html`.
 2. Setelah tiap potongan: reload browser, pastikan Console bersih dari error, lalu jalankan checklist singkat untuk tab yang terkena.
 3. Hapus `app.js` kalau isinya sudah kosong.
 
-### Fase 3: CSS
+#### (Dipindah) CSS
 Potong `style.css` menjadi 4 file dengan urutan blok tetap. Bandingkan tampilan kedua tab sebelum dan sesudah dengan screenshot di `tmp/screenshot/`.
 
 ### Fase 4: Rilis
-1. Jalankan checklist manual lengkap di laptop pengembangan.
+1. Jalankan checklist manual lengkap di laptop pengembangan. Frontend tidak berubah, jadi fokusnya pada perilaku API, kamera, dan simpan/muat data.
 2. Jalankan checklist manual lengkap di **laptop akuisisi** dengan kamera asli dan data lama.
 3. Update `README.md` (bagian struktur kode), `CHANGELOG.md`, dan memory proyek.
 4. Merge ke `main`, tag `v0.2.0`, lalu hapus branch refactor lama.

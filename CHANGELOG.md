@@ -12,7 +12,7 @@ Target rilis 0.2.0: refactor backend tanpa mengubah perilaku (lihat `docs/refact
 
 ### Changed (UI, branch `feat/ui-v0.3.0`, target 0.3.0)
 - Tampilan ditulis ulang mengikuti prototipe (`docs/ui/`): dua layar (Akuisisi, Analisis sel) dengan navigasi tahap, bar sesi, bar status, tema terang/gelap, font Atkinson Hyperlegible offline, tanpa scroll halaman.
-- Akuisisi: status fokus juga tampil di atas stream, tanda prasyarat (kamera, inisial, folder), alasan tombol Simpan mati ditulis.
+- Akuisisi: setelah Ambil citra, area stream terbelah (live di kiri, citra diam sama besar di kanan beserta lencana fokus) selama citra belum disimpan, lalu live kembali penuh (K-B4; menggantikan thumbnail kecil di panel kanan). Status fokus juga tampil di atas stream, tanda prasyarat (kamera, inisial, folder), alasan tombol Simpan mati ditulis.
 - Analisis: inspektur sel dengan tombol kelas dan verdict besar untuk layar sentuh, shortcut B (Benar) dan S (Salah) yang langsung pindah ke sel berikutnya, tombol "Tandai sisanya benar" juga di inspektur (alur v0.1.0: tandai yang salah, sisanya disetujui sekaligus), banner "alat bantu, bukan diagnosis" dan status model mock yang mencolok. Laporan/export dan pengaturan model pindah ke dialog.
 - Galat: bar galat persisten (judul "Gagal", tidak hilang sendiri) dengan tombol pemulihan (Coba hubungkan lagi, Sambungkan ulang kamera, Pilih lokasi lain, Coba simpan lagi). Server mati tampil sebagai "Terputus dari aplikasi" dan hilang sendiri saat tersambung lagi; tombol tidak macet dalam keadaan mati.
 - Ambil citra saat citra sebelumnya belum disimpan kini bertanya dulu (Simpan dulu, Buang, Batal).

@@ -938,6 +938,8 @@ async function loadFolderSummary(options = {}) {
 }
 
 function updateSaveButtonState() {
+  // Citra diam tampil berdampingan dengan live hanya selama belum disimpan.
+  document.getElementById("stillPane").classList.toggle("view-hidden", !(hasCapturedImage && !currentCaptureSaved));
   const hasPatient = !!patientNameInput.value.trim();
   btnSave.disabled = !(hasCapturedImage && selectedFolder && hasPatient);
   prereqCamera.classList.toggle("prereq-ok", isCameraConnected);
@@ -1035,6 +1037,7 @@ async function doSave(mode) {
   lastSavedId = currentId;
   currentCaptureSaved = true;
   currentCaptureSavedAs = data.filename;
+  updateSaveButtonState(); // live kembali penuh
   lastSavedFullPath = data.path;
   btnSendToSegmentation.disabled = false;
   if (lastCapturedImage) addToGallery(data.filename, lastCapturedImage);

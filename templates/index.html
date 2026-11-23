@@ -112,6 +112,20 @@
             <div class="specimen" id="streamBody">
               <span class="placeholder-text">Kamera belum terhubung.<br />Pilih kamera di atas, lalu tekan Hubungkan.</span>
             </div>
+            <!-- Citra diam, berdampingan dengan live hanya selama belum disimpan (K-B4). -->
+            <div id="stillPane" class="still-pane view-hidden" aria-label="Citra hasil ambil, belum disimpan">
+              <div class="still-head">
+                <strong>Hasil ambil</strong>
+                <span class="muted small">Belum disimpan. Enter = simpan, Spasi = ambil ulang.</span>
+              </div>
+              <div class="specimen" id="captureBody"></div>
+              <div class="badge-group still-badges">
+                <span id="focusBadge" class="badge badge-hidden"></span>
+                <span id="edgeBadge" class="badge badge-hidden"></span>
+                <span id="blankBadge" class="badge badge-hidden"></span>
+                <span id="semanticBadge" class="badge badge-hidden"></span>
+              </div>
+            </div>
             <div id="focusOverlay" class="focus-overlay view-hidden" aria-hidden="true"></div>
             <div id="streamChip" class="stream-chip view-hidden" aria-live="polite"></div>
             <div id="autoPanel" class="auto-panel view-hidden" aria-live="polite">
@@ -149,19 +163,10 @@
 
             <button id="btnCapture" type="button" class="btn btn-primary btn-hero" disabled>Ambil citra <kbd>Spasi</kbd></button>
 
-            <section class="card card-fill capture-card">
+            <section class="card capture-card">
               <div class="card-head">
                 <h2>Hasil ambil</h2>
                 <span id="captureBadge" class="badge badge-hidden"></span>
-              </div>
-              <div class="capture-thumb" id="captureBody">
-                <span class="placeholder-text">Belum ada citra.</span>
-              </div>
-              <div class="badge-group">
-                <span id="focusBadge" class="badge badge-hidden"></span>
-                <span id="edgeBadge" class="badge badge-hidden"></span>
-                <span id="blankBadge" class="badge badge-hidden"></span>
-                <span id="semanticBadge" class="badge badge-hidden"></span>
               </div>
               <div id="captureFilename" class="muted small"></div>
               <button id="btnSave" type="button" class="btn btn-secondary btn-block" disabled>Simpan <kbd>Enter</kbd></button>

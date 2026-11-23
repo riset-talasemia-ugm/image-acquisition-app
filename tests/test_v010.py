@@ -29,17 +29,11 @@ sys.path.insert(0, ROOT)
 
 # --- Satu-satunya bagian yang boleh diubah selama refactor: dari mana simbol di-import. ---
 from app import app as flask_app  # noqa: E402
-from app import (  # noqa: E402
-    RBC_CLASS_LABELS,
-    SEGMENTATION_LOG_FIELDNAMES,
-    _ensure_log_columns,
-    analyze_focus,
-    is_blank_frame,
-    log_capture_csv,
-    next_iteration_from_folder,
-    resize_for_save,
-    safe_slug,
-)
+from capture import next_iteration_from_folder, resize_for_save  # noqa: E402
+from config import RBC_CLASS_LABELS, SEGMENTATION_LOG_FIELDNAMES  # noqa: E402
+from csvlog import _ensure_log_columns, log_capture_csv  # noqa: E402
+from quality import analyze_focus, is_blank_frame  # noqa: E402
+from utils import safe_slug  # noqa: E402
 # -----------------------------------------------------------------------------------------
 
 RECORD = os.environ.get("RECORD_EXPECTED", "").strip() == "1"

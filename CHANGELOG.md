@@ -4,7 +4,14 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/id/1.1.0/) dan pe
 
 ## [Unreleased]
 
-Rencana: refactor struktur kode tanpa mengubah perilaku (lihat `docs/refactor/`). Target rilis 0.2.0.
+Target rilis 0.2.0: refactor backend tanpa mengubah perilaku (lihat `docs/refactor/`). Frontend tidak berubah; ditulis ulang di 0.3.0.
+
+### Changed
+- `app.py` (2.383 baris) dipecah menjadi `config.py`, `csvlog.py`, `quality.py`, `camera.py`, `capture.py` (blueprint `capture_bp`), `utils.py`, dan paket `segmentation/` (blueprint `segmentation_bp`: `mock_model.py`, `storage.py`, `routes.py`, `export.py`). `app.py` tinggal 42 baris.
+- Kode dipindah apa adanya: 90 definisi top-level v0.1.0 ada dengan teks identik, 29 route dengan URL, method, dan fungsi yang sama.
+
+### Added
+- Tes karakterisasi `tests/test_v010.py` (14 tes) dengan acuan `tests/expected_v0.1.0.json`, termasuk data akuisisi lama di `tmp/data-uji/` (tidak di-commit).
 
 ## [0.1.0] - 2026-11-23
 

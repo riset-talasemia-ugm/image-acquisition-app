@@ -2,6 +2,13 @@
 
 Status: **hanya rancangan, belum ada kode** (sesuai permintaan). Tidak ada file proyek yang diubah.
 
+> **Catatan 2026-11-23 (refactor v0.2.0):** rujukan `app.py:<baris>` di dokumen ini mengacu ke monolith v0.1.0. Sejak v0.2.0, kodenya dipindah apa adanya:
+> - `compute_focus_score` dan `is_blank_frame` ada di `quality.py`;
+> - `CameraManager`, callback ToupCam, dan `gen_mjpeg` ada di `camera.py`;
+> - `api_save`, `next_iteration_from_folder`, dan `save_lock` ada di `capture.py` dan `csvlog.py`.
+>
+> Pertanyaan "kode hardware di `app.py` atau file baru" terjawab oleh struktur modul: kode motor dan stage menjadi modul baru sendiri.
+
 ## Context
 
 Aplikasi capture (Flask monolith: `app.py`, `static/js/app.js`, `templates/index.html`) saat ini bersifat manual: operator menekan Capture, lalu Save. Skor fokus hanya informasi (badge), dihitung sekali saat capture, dan tidak memblokir apa pun. Tujuan akhirnya adalah mendampingi mikroskop cerdas: motor menggerakkan fokus (Z) dan stage XY mengikuti pola snake, dan gambar hanya disimpan jika kualitasnya layak.

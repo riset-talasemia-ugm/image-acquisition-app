@@ -95,7 +95,7 @@ Di bawah panel Stream ada kartu **Kualitas Fokus (seluruh frame)**. Dokter menga
 
 **Perhatikan**
 - Referensi puncak **direset otomatis** kalau lapang pandang berganti (citra kasar tidak lagi cocok dengan referensi). Tombol **Reset puncak** untuk reset manual.
-- Ambang status (`FOCUS_REL_GOOD = 0.85`, `FOCUS_REL_WARN = 0.65` di `app.py`) **masih heuristik**, belum dikalibrasi dengan label dokter. Yang dicatat ke log adalah nilai mentahnya, supaya ambang bisa dikalibrasi setelah ada penilaian dokter.
+- Ambang status (`FOCUS_REL_GOOD = 0.85`, `FOCUS_REL_WARN = 0.65` di `config.py`) **masih heuristik**, belum dikalibrasi dengan label dokter. Yang dicatat ke log adalah nilai mentahnya, supaya ambang bisa dikalibrasi setelah ada penilaian dokter.
 - Tile tanpa sel (latar kosong) tidak dihitung. Ambangnya (`FOCUS_TILE_MIN_STD`) berupa perkiraan, karena pada data 27-08 hampir semua tile berisi sel.
 - Kartu bisa dimatikan dengan mencentang/mengosongkan **Live** (menghemat CPU; analisis tetap berjalan saat Capture).
 - Satu analisis frame 5 MP sekitar 0,1 detik di laptop; di Jetson belum diukur. Kartu memoll tiap ~0,7 detik.
@@ -124,7 +124,20 @@ Di laptop pengembangan, venv aplikasi sudah berisi PyTorch versi CPU dan `open_c
 
 ```
 thalassemia-capture-app/
-├── app.py                 # Backend Flask + kontrol kamera (OpenCV)
+├── app.py                 # Membuat app Flask, mendaftarkan blueprint, halaman utama
+├── config.py              # Konstanta dan env var (ambang fokus, CLIP, daftar kelas, nama log)
+├── csvlog.py              # Lock global dan penulisan capture_log.csv / segmentation_log.csv
+├── quality.py             # Kualitas fokus per tile, FocusTracker, skor CLIP opsional
+├── camera.py              # Kamera (OpenCV/ToupCam) dan stream MJPEG
+├── capture.py             # Route kamera, capture, fokus, pilih folder, simpan
+├── utils.py               # Helper bersama (safe_slug, frame_to_png_base64)
+├── segmentation/          # Tab Segmentasi
+│   ├── __init__.py         # Blueprint segmentation_bp
+│   ├── mock_model.py       # Model DUMMY (deteksi acak), nanti diganti model asli
+│   ├── storage.py          # Baca hasil tersimpan dan konfigurasi model
+│   ├── routes.py           # Route run/load/list/save/batch/ringkasan/model
+│   └── export.py           # Export laporan Excel dan dataset COCO
+├── tests/                 # Tes karakterisasi (python -m unittest discover -s tests)
 ├── requirements.txt
 ├── run.bat                 # Runner otomatis untuk Windows
 ├── run.sh                  # Runner otomatis untuk Ubuntu/Linux
@@ -172,4 +185,4 @@ thalassemia-capture-app/
 - Ini kasus yang butuh SDK vendor ToupCam (lihat bagian Persyaratan di atas). Aplikasi otomatis coba backend ini duluan sebelum fallback ke V4L2 -- kalau kamera tetap tidak muncul di dropdown aplikasi, cek:
   1. Udev rule sudah terinstall (`ls /etc/udev/rules.d/99-toupcam.rules`) dan kamera sudah dicabut-colok ulang setelahnya.
   2. Konsol server (`python app.py`) menampilkan baris `[DEBUG] ToupCam EnumV2 gagal: ...` atau `[DEBUG] ToupCam SDK gagal dimuat: ...` -- pesan errornya biasanya menunjukkan penyebabnya (mis. `libtoupcam.so` tidak ditemukan).
-  3. Untuk arsitektur CPU selain arm64/x64 (belum dibundel), tambahkan folder baru `vendor/toupcam/<arch>/` berisi `toupcam.py` + `libtoupcam.so` yang sesuai dari ToupCamSDK, lalu daftarkan di `_TOUPCAM_ARCH_MAP` pada `app.py`.
+  3. Untuk arsitektur CPU selain arm64/x64 (belum dibundel), tambahkan folder baru `vendor/toupcam/<arch>/` berisi `toupcam.py` + `libtoupcam.so` yang sesuai dari ToupCamSDK, lalu daftarkan di `_TOUPCAM_ARCH_MAP` pada `camera.py`.

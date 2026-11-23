@@ -1,5 +1,12 @@
 # Arsitektur: v0.1.0 dan Target Refactor
 
+> **Status 2026-11-23:** target backend (bagian 2.1) sudah tercapai di branch `refactor/v0.2.0` (Fase 1 selesai). Bedanya dengan rencana:
+> - `log_capture_csv` masuk ke `csvlog.py`, bukan `capture.py`, karena ia memanggil `_ensure_log_columns`;
+> - `utils.py` ditambahkan untuk `safe_slug` dan `frame_to_png_base64`, yang dipakai capture dan segmentasi;
+> - `segmentation/routes.py` 660 baris, sedikit di atas patokan.
+>
+> Frontend (bagian 2.2) tidak dikerjakan di v0.2.0, karena ditulis ulang di v0.3.0.
+
 ## 1. Kondisi sekarang (v0.1.0)
 
 Semua kode ada di empat file:

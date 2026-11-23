@@ -38,6 +38,20 @@ Refactor dianggap selesai kalau:
 ### Fase 1: Backend
 Urutannya dari bagian yang paling sedikit bergantung ke yang paling banyak. Setelah tiap langkah: jalankan tes, lalu commit.
 
+**Status (2026-11-23): selesai**, commit `5f200b8` sampai `62e529a`. Verifikasi per langkah:
+- cek nama tak terdefinisi;
+- setiap baris yang dihapus dari `app.py` muncul utuh di modul tujuan;
+- 30 rute;
+- tes 14/14 lulus.
+
+Verifikasi akhir:
+- 90 definisi top-level v0.1.0 ada dengan teks identik, tanpa duplikat;
+- 29 route menunjuk ke fungsi yang sama;
+- server `python app.py` (debug, reloader) menyajikan halaman, statis, dan API;
+- uji asap kamera dengan webcam laptop pada v0.1.0 dan refactor memberi hasil yang sama: connect, stream, capture, fokus live, save, ringkasan folder.
+
+Belum diuji: MiiCam (tidak bisa dibuka saat uji, juga lewat OpenCV langsung) dan ToupCam/Linux/Jetson.
+
 | Langkah | Pindahkan ke | Isi |
 |---|---|---|
 | 1.1 | `config.py` | Konstanta dan env var |
@@ -62,6 +76,8 @@ Tidak dikerjakan di v0.2.0. Rencana lama di bawah hanya sebagai catatan; struktu
 Potong `style.css` menjadi 4 file dengan urutan blok tetap. Bandingkan tampilan kedua tab sebelum dan sesudah dengan screenshot di `tmp/screenshot/`.
 
 ### Fase 4: Rilis
+Status (2026-11-23): langkah 3 (README, CHANGELOG, memory) selesai. Langkah 1-2 (checklist manual) dan 4 (merge, tag) menunggu pengujian di laptop akuisisi.
+
 1. Jalankan checklist manual lengkap di laptop pengembangan. Frontend tidak berubah, jadi fokusnya pada perilaku API, kamera, dan simpan/muat data.
 2. Jalankan checklist manual lengkap di **laptop akuisisi** dengan kamera asli dan data lama.
 3. Update `README.md` (bagian struktur kode), `CHANGELOG.md`, dan memory proyek.

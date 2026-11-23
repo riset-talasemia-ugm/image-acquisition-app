@@ -80,6 +80,7 @@ def _load_segmentation_detail_file(detail_path):
     detections = detail.get("detections") or []
 
     response = {
+        **({"labelMode": detail["labelMode"]} if detail.get("labelMode") else {}),  # tanpa field = satu kelas
         "ok": True,
         "path": source_image,
         "detailFile": os.path.basename(detail_path),

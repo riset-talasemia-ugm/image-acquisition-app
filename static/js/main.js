@@ -114,6 +114,7 @@ loadCameras().then(async () => {
 setInterval(refreshSystemStatus, 60000);
 loadClassLegend();
 loadSegModelStatus();
+loadAttrVocab();
 updateSaveButtonState();
 renderInspector();
 setInterval(checkCameraStatus, 2000);

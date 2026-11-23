@@ -270,6 +270,11 @@ Hal yang perlu diuji di repo eksperimen:
 - Ukuran mungkin lebih baik **diukur** dari luas mask dengan kalibrasi piksel ke µm (mikrometer objektif, perbesaran tetap) daripada ditebak model.
 - Evaluasi per atribut (F1 per bentuk, akurasi ukuran dan warna, kappa dengan dokter per atribut), bukan satu akurasi kelas.
 
+**Status persiapan di aplikasi (2026-11-23, `feat/ui-v0.3.0`, atas permintaan pengguna yang sedang membuat model ini di `../sardjito-atribut-eksperimen`):** butir di bawah sudah dibuat, kecuali file perbandingan F15 (belum ada sama sekali).
+- `attributes.py`: kosakata `ukuran` (mikrosit/normosit/makrosit/None), `warna` (normokrom/hipokrom), `bentuk` (kelompok = nama kelas 16 dataset); `resolve_class` disalin dari `tambahan-dataset` commit 073b2cc; kelas dataset 13-15 dipetakan sementara ke kelas aplikasi (Bite, Blister -> Schistocyte; Microcytic Hypochromia -> Hypochromia) sampai daftar kelas final.
+- Model: `outputType` di konfigurasi model; mock mengeluarkan atribut bila `attributes`. Model asli nanti mengisi `attributes` dan `classIndex` (kelas turunan) per deteksi.
+- Review: mode "Ukuran, bentuk, warna" di inspektur; kelas turunan dihitung server (`POST /api/segmentation/attributes`) supaya aturannya satu sumber.
+
 Yang perlu dijaga di aplikasi supaya model seperti ini bisa dipasang tanpa rombak ulang:
 - Metadata model menyatakan jenis keluarannya: `single` (kelas tunggal) atau `attributes` (daftar atribut dan nilainya).
 - Kontrak deteksi mendapat field opsional `attributes` di samping `classIndex`. Untuk model kelas tunggal, field ini kosong. `classIndex` tetap diisi kelas turunan.

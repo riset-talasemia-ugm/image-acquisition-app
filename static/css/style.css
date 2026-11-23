@@ -619,6 +619,11 @@ input::placeholder { color: var(--muted); opacity: 0.8; }
 .pager { display: flex; gap: 4px; }
 .cell-head { display: flex; gap: 12px; align-items: flex-start; }
 .cell-crop { width: 144px; height: 144px; flex: none; border-radius: 6px; background: var(--specimen-bg); image-rendering: auto; }
+.mode-toggle { align-self: flex-start; }
+.attr-group { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.attr-group .group-label { flex-basis: 100%; }
+.attr-btn { min-height: 36px; padding: 0 10px; font-size: 13px; }
+.attr-btn[aria-pressed="true"] { border: 2px solid var(--ink); background: var(--sunken); font-weight: 700; }
 .class-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
 .class-btn {
   display: flex;

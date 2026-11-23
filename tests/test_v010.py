@@ -164,6 +164,7 @@ class TestRoutes(Base):
             "/api/rating/next POST",
             "/api/rating/submit POST",
             "/api/recovery/capture GET,POST",
+            "/api/segmentation/attributes GET,POST",
             "/api/segmentation/open-path POST",
             "/api/system/status GET",
             "/laporan GET",

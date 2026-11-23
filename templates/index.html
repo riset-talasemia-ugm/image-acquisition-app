@@ -409,6 +409,14 @@
         <span>Path checkpoint model</span>
         <input type="text" id="segModelPathInput" placeholder="Opsional, untuk integrasi model asli" />
       </label>
+      <label class="field field-stack" for="segModelOutputType">
+        <span>Jenis keluaran model</span>
+        <select id="segModelOutputType">
+          <option value="single">Kelas tunggal (satu kelas per sel)</option>
+          <option value="attributes">Atribut: ukuran, bentuk, warna (kelas diturunkan)</option>
+        </select>
+      </label>
+      <p class="muted small">Selama model masih mock, pilihan ini menentukan apa yang dikeluarkan mock, supaya alur model multi-label bisa diuji sebelum model aslinya siap.</p>
       <label class="field field-stack" for="segLowConfidenceThresholdInput" title="Sel dengan keyakinan di bawah angka ini ditandai dan digaris putus-putus">
         <span>Ambang keyakinan rendah (%)</span>
         <input type="number" id="segLowConfidenceThresholdInput" min="1" max="100" value="70" />

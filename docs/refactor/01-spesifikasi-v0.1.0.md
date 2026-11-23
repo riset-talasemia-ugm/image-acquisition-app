@@ -100,6 +100,9 @@ Variabel lingkungannya `CLIP_QUALITY`, `CLIP_MODEL`, dan `CLIP_PRETRAINED`. Cara
 
 Hanya penambahan field; field lama tidak berubah.
 
+- Deteksi: field opsional `attributes` {`ukuran`, `warna`, `bentuk`} dari model multi-label dan `correctedAttributes` dari review dokter; `classIndex`/`correctedClassIndex` tetap kelas (turunan). File detail mendapat `labelMode: "attributes"` hanya untuk review mode atribut.
+- `model-status`/`model-config`: field `outputType` (`single` | `attributes`).
+
 - `GET /api/camera/status`: field `frozen` (bool), true bila stream dibaca tetapi isi frame tidak berubah lebih dari `CAMERA_FROZEN_SECONDS` (branch `feat/ui-v0.3.0`).
 - `POST /api/save` saat gagal: field `code` (`folder`, `disk_full`, `permission`, `write`, `encode`) dan `message` yang menyebut penyebab. File PNG kini ditulis lewat `cv2.imencode` + `open()`; isinya sama dengan `cv2.imwrite`, tetapi path non-ASCII di Windows ikut berhasil.
 - Rute baru (tercatat di `tests/test_v010.py`, `TestRoutes`):
@@ -107,4 +110,5 @@ Hanya penambahan field; field lama tidak berubah.
   - `GET|POST /api/recovery/capture`: salinan citra belum tersimpan di `recovery/` (UC-10); POST `{action: "restore"|"discard"}`;
   - `POST /api/rating/next {folder, rater, id?}` dan `POST /api/rating/submit {folder, rater, id, verdict, reasons, note}`: lembar penilaian citra (F14, `rating.py`);
   - `GET /laporan?folder=&patient=`: laporan pasien siap cetak/PDF (UC-07, `report.py`);
+  - `GET|POST /api/segmentation/attributes`: kosakata atribut dan kelas turunan (persiapan model multi-label, `attributes.py`);
   - `POST /api/segmentation/open-path {path}`: buka gambar sumber tanpa dialog, bentuk respons sama dengan `select-image`.

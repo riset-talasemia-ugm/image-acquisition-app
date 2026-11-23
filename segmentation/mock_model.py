@@ -3,10 +3,20 @@
 import math
 import random
 
+from attributes import BENTUK, derived_class_index
 from config import RBC_CLASS_LABELS
 
 
-def generate_mock_instance_segmentation(frame):
+def _mock_attributes():
+    """Atribut acak yang kira-kira wajar: kebanyakan normosit, normokrom, bentuk normal."""
+    return {
+        "ukuran": random.choices(["normosit", "mikrosit", "makrosit", None], weights=[60, 25, 5, 10])[0],
+        "warna": random.choices(["normokrom", "hipokrom"], weights=[75, 25])[0],
+        "bentuk": random.sample(list(BENTUK), k=1) if random.random() < 0.3 else [],
+    }
+
+
+def generate_mock_instance_segmentation(frame, output_type="single"):
     """PLACEHOLDER -- BUKAN model beneran.
 
     Rencananya di sini nanti dipasang inference Mask R-CNN/Detectron2 yang
@@ -35,7 +45,11 @@ def generate_mock_instance_segmentation(frame):
         cx = random.randint(max_r, max(max_r + 1, w - max_r))
         cy = random.randint(max_r, max(max_r + 1, h - max_r))
         r = random.randint(min_r, max_r)
-        class_index = random.choices(range(len(RBC_CLASS_LABELS)), weights=weights, k=1)[0]
+        # output_type "attributes": meniru model multi-label (ukuran, bentuk, warna);
+        # classIndex diisi kelas turunan, seperti yang harus dilakukan model asli.
+        attributes = _mock_attributes() if output_type == "attributes" else None
+        class_index = (derived_class_index(attributes) if attributes
+                       else random.choices(range(len(RBC_CLASS_LABELS)), weights=weights, k=1)[0])
         confidence = round(random.uniform(0.55, 0.98), 3)
 
         # Bentuk mask sebagai polygon (bukan lingkaran sempurna, dikasih
@@ -53,12 +67,15 @@ def generate_mock_instance_segmentation(frame):
 
         bbox_x = max(0, cx - r)
         bbox_y = max(0, cy - r)
-        detections.append({
+        det = {
             "id": i,
             "classIndex": class_index,
             "classLabel": RBC_CLASS_LABELS[class_index],
             "confidence": confidence,
             "bbox": [bbox_x, bbox_y, min(2 * r, w - bbox_x), min(2 * r, h - bbox_y)],
             "mask": points,
-        })
+        }
+        if attributes:
+            det["attributes"] = attributes
+        detections.append(det)
     return detections

@@ -22,6 +22,7 @@ from config import (
 from csvlog import _ensure_log_columns, segmentation_log_lock
 from segmentation import segmentation_bp
 from segmentation.mock_model import generate_mock_instance_segmentation
+from attributes import BENTUK, UKURAN, WARNA, clean, derived_class_index
 from rating import rating_summary
 from segmentation.storage import _latest_segmentation_rows, _load_model_config, _load_segmentation_detail_file
 from utils import frame_to_png_base64
@@ -41,6 +42,19 @@ def api_segmentation_classes():
         {"index": i, "label": label, "color": RBC_CLASS_COLORS[i]}
         for i, label in enumerate(RBC_CLASS_LABELS)
     ])
+
+
+@segmentation_bp.route("/api/segmentation/attributes", methods=["GET", "POST"])
+def api_segmentation_attributes():
+    """GET: kosakata atribut (ukuran, warna, kelompok bentuk). POST {attributes}:
+    kelas turunan untuk mode review "Ukuran, bentuk, warna" (attributes.py)."""
+    if request.method == "GET":
+        return jsonify({"ukuran": UKURAN, "warna": WARNA, "bentuk": list(BENTUK)})
+    attrs = clean((request.json or {}).get("attributes"))
+    if attrs is None:
+        return jsonify({"ok": False, "message": "Atribut tidak valid."}), 400
+    index = derived_class_index(attrs)
+    return jsonify({"ok": True, "attributes": attrs, "classIndex": index, "classLabel": RBC_CLASS_LABELS[index]})
 
 
 @segmentation_bp.route("/api/segmentation/select-image", methods=["POST"])
@@ -132,7 +146,7 @@ def api_segmentation_run():
     # gunanya buat dites -- kecilkan/hapus begitu inference asli dipasang.
     time.sleep(1.2)
 
-    detections = generate_mock_instance_segmentation(frame)
+    detections = generate_mock_instance_segmentation(frame, _load_model_config().get("outputType", "single"))
     class_counts = {label: 0 for label in RBC_CLASS_LABELS}
     for d in detections:
         class_counts[d["classLabel"]] += 1
@@ -256,6 +270,7 @@ def api_segmentation_save():
     patient_id = (data.get("patientId") or "").strip()
     detections = data.get("detections") or []
     force = bool(data.get("force"))
+    label_mode = "attributes" if data.get("labelMode") == "attributes" else "single"
 
     if not path or not os.path.isfile(path):
         return jsonify({"ok": False, "message": "Gambar sumber tidak valid."}), 400
@@ -335,15 +350,20 @@ def api_segmentation_save():
             detail_path = os.path.join(folder, detail_filename)
             dedup_suffix += 1
         try:
+            detail = {
+                "timestamp": timestamp,
+                "patientId": patient_id,
+                "sourceImage": path,
+                "detections": detections,
+                "isDuplicate": is_duplicate,
+                "duplicateOfFile": duplicate_of or None,
+            }
+            # Mode review atribut dicatat per hasil (F15); mode satu kelas = bawaan,
+            # tidak ditulis supaya bentuk file v0.1.0 tidak berubah.
+            if label_mode == "attributes":
+                detail["labelMode"] = label_mode
             with open(detail_path, "w", encoding="utf-8") as f:
-                json.dump({
-                    "timestamp": timestamp,
-                    "patientId": patient_id,
-                    "sourceImage": path,
-                    "detections": detections,
-                    "isDuplicate": is_duplicate,
-                    "duplicateOfFile": duplicate_of or None,
-                }, f, ensure_ascii=False, indent=2)
+                json.dump(detail, f, ensure_ascii=False, indent=2)
         except OSError as e:
             return jsonify({"ok": False, "message": f"Gagal menyimpan file detail: {e}"}), 500
 
@@ -492,7 +512,7 @@ def api_segmentation_batch_run():
             # batch banyak file nggak kelamaan -- hapus kalau model beneran
             # sudah dipasang (delay ini murni buat placeholder).
             time.sleep(0.3)
-            detections = generate_mock_instance_segmentation(frame)
+            detections = generate_mock_instance_segmentation(frame, _load_model_config().get("outputType", "single"))
 
             base_name = os.path.splitext(fname)[0]
             timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -687,6 +707,7 @@ def api_segmentation_model_status():
         "modelPath": model_path,
         "modelFileFound": model_file_found,
         "lowConfidenceThreshold": config["lowConfidenceThreshold"],
+        "outputType": config.get("outputType", "single"),
         "message": "Semua hasil segmentasi saat ini masih DUMMY/placeholder. " + detail,
     })
 
@@ -701,12 +722,17 @@ def api_segmentation_model_config():
             raise ValueError
     except (TypeError, ValueError):
         threshold = DEFAULT_LOW_CONFIDENCE_THRESHOLD
+    # Jenis keluaran model: "single" (satu kelas per sel) atau "attributes"
+    # (ukuran, bentuk, warna + kelas turunan). Untuk model asli nanti diambil
+    # dari metadata model; selama mock, menentukan apa yang dikeluarkan mock.
+    output_type = data.get("outputType") if data.get("outputType") in ("single", "attributes") else "single"
     try:
         with open(MODEL_CONFIG_PATH, "w", encoding="utf-8") as f:
             json.dump(
-                {"modelPath": model_path, "lowConfidenceThreshold": threshold},
+                {"modelPath": model_path, "lowConfidenceThreshold": threshold, "outputType": output_type},
                 f, ensure_ascii=False, indent=2,
             )
     except OSError as e:
         return jsonify({"ok": False, "message": f"Gagal menyimpan konfigurasi: {e}"}), 500
-    return jsonify({"ok": True, "modelPath": model_path, "lowConfidenceThreshold": threshold})
+    return jsonify({"ok": True, "modelPath": model_path, "lowConfidenceThreshold": threshold,
+                    "outputType": output_type})

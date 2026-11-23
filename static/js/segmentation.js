@@ -527,6 +527,7 @@ function applyLoadedSegmentationResult(data) {
     doctorVerdict: d.doctorVerdict ?? null, // kompatibel dgn file lama sblm fitur ini ada
   }));
   segCleanJson = JSON.stringify(segDetections);
+  if (data.labelMode) segLabelMode = data.labelMode;
   segActiveCellId = null;
   updateCellSizeButtonsState();
   segAddMode = false;
@@ -956,6 +957,7 @@ async function trySaveSegmentation(force) {
       path: segSelectedPath,
       patientId: segPatientNameInput.value.trim(),
       detections: segDetections,
+      labelMode: segLabelMode,
       force,
     }),
   });
@@ -1307,6 +1309,7 @@ async function loadSegModelStatus() {
     const data = await res.json();
     segModelStatusText.textContent = data.message || "Status model tidak diketahui.";
     segModelPathInput.value = data.modelPath || "";
+    document.getElementById("segModelOutputType").value = data.outputType || "single";
     // Selama model masih mock, statusnya harus mencolok di banner dan bar status.
     segModelBanner.textContent = data.usingMock
       ? "Model yang terpasang masih mock: kelas sel diisi acak untuk uji alur."
@@ -1332,6 +1335,7 @@ async function doSaveSegModelConfig() {
     body: JSON.stringify({
       modelPath: segModelPathInput.value.trim(),
       lowConfidenceThreshold: parseInt(segLowConfidenceThresholdInput.value, 10),
+      outputType: document.getElementById("segModelOutputType").value,
     }),
   });
   const data = await res.json();
@@ -1454,6 +1458,30 @@ function renderInspector() {
     lowConf ? "keyakinan rendah" : "",
     idx !== det.classIndex ? "dikoreksi" : "",
   ].filter(Boolean).join(", ");
+  const attrs = det.correctedAttributes || det.attributes || null;
+  const attrText = (a) =>
+    a ? `ukuran ${a.ukuran || "tidak diketahui"}, warna ${a.warna || "tidak diketahui"}, bentuk ${a.bentuk.length ? a.bentuk.join(" + ") : "normal"}` : "";
+  const modeToggle = `
+    <div class="seg-toggle mode-toggle" role="radiogroup" aria-label="Mode label review">
+      <button type="button" role="radio" class="seg-image-tab${segLabelMode === "single" ? " seg-image-tab-active" : ""}" aria-checked="${segLabelMode === "single"}" data-action="mode" data-mode="single">Satu kelas</button>
+      <button type="button" role="radio" class="seg-image-tab${segLabelMode === "attributes" ? " seg-image-tab-active" : ""}" aria-checked="${segLabelMode === "attributes"}" data-action="mode" data-mode="attributes">Ukuran, bentuk, warna</button>
+    </div>`;
+  const cur = attrs || { ukuran: null, warna: "normokrom", bentuk: [] };
+  const attrButtons = (key, values, multi) =>
+    values
+      .map((v) => {
+        const on = multi ? cur.bentuk.includes(v) : cur[key] === v;
+        return `<button type="button" class="btn attr-btn" data-action="attr" data-key="${key}" data-value="${v}" aria-pressed="${on}">${v}</button>`;
+      })
+      .join("");
+  const attrPanel = segAttrVocab
+    ? `
+    ${det.attributes ? `<div class="muted small">Atribut dari model: ${attrText(det.attributes)}</div>` : ""}
+    <div class="attr-group"><span class="group-label">Ukuran</span>${attrButtons("ukuran", segAttrVocab.ukuran)}<button type="button" class="btn attr-btn" data-action="attr" data-key="ukuran" data-value="" aria-pressed="${!cur.ukuran}">tidak diketahui</button></div>
+    <div class="attr-group"><span class="group-label">Warna</span>${attrButtons("warna", segAttrVocab.warna)}</div>
+    <div class="attr-group"><span class="group-label">Bentuk, boleh lebih dari satu (kosong = normal)</span>${attrButtons("bentuk", segAttrVocab.bentuk, true)}</div>
+    <div class="small">Kelas turunan: <strong>${segClassLabels[idx] ? segClassLabels[idx].label : "-"}</strong></div>`
+    : '<p class="muted small">Daftar atribut belum termuat.</p>';
   const classButtons = segClassLabels
     .map(
       (c) => `
@@ -1476,7 +1504,8 @@ function renderInspector() {
       <canvas id="cellCrop" class="cell-crop" width="144" height="144" role="img" aria-label="Potongan citra sel ${n}, diperbesar"></canvas>
       <div class="muted small">Kelas dari model:<br /><strong>${det.manual ? "tidak ada (sel manual)" : model ? model.label : "-"}</strong><br />${tags}</div>
     </div>
-    <div class="class-grid" role="group" aria-label="Kelas sel">${classButtons}</div>
+    ${modeToggle}
+    ${segLabelMode === "attributes" ? attrPanel : `<div class="class-grid" role="group" aria-label="Kelas sel">${classButtons}</div>`}
     <div class="verdict">
       <button type="button" class="btn verdict-ok" data-action="verdict" data-verdict="correct" aria-pressed="${det.doctorVerdict === "correct"}">Benar <kbd>B</kbd></button>
       <button type="button" class="btn verdict-bad" data-action="verdict" data-verdict="incorrect" aria-pressed="${det.doctorVerdict === "incorrect"}">Salah <kbd>S</kbd></button>
@@ -1528,6 +1557,16 @@ function handleInspectorClick(e) {
   const det = segDetections.find((d) => d.id === segActiveCellId);
   if (!det) return;
   const action = btn.dataset.action;
+  if (action === "mode") {
+    segLabelMode = btn.dataset.mode;
+    localStorage.setItem("adt-label-mode", segLabelMode);
+    renderInspector();
+    return;
+  }
+  if (action === "attr") {
+    setDetAttribute(det, btn.dataset.key, btn.dataset.value);
+    return;
+  }
   if (action === "class") setDetClass(det, parseInt(btn.dataset.index, 10));
   else if (action === "verdict") setDetVerdict(det, btn.dataset.verdict);
   else if (action === "delete") deleteDetection(det.id);
@@ -1535,4 +1574,37 @@ function handleInspectorClick(e) {
     const i = segDetections.indexOf(det) + (action === "next" ? 1 : -1);
     if (i >= 0 && i < segDetections.length) setActiveCell(segDetections[i].id);
   }
+}
+
+// -----------------------------------------------------------------------
+// Mode review "Ukuran, bentuk, warna" (F15) dan persiapan model multi-label.
+// Atribut dokter disimpan di correctedAttributes; kelas turunannya (aturan
+// resolve_class di attributes.py, dihitung server supaya satu sumber) menjadi
+// kelas koreksi, sehingga hitungan, laporan, dan export tetap memakai satu kelas.
+// -----------------------------------------------------------------------
+let segLabelMode = localStorage.getItem("adt-label-mode") || "single";
+let segAttrVocab = null; // {ukuran: [...], warna: [...], bentuk: [...]}
+
+async function loadAttrVocab() {
+  const res = await fetch("/api/segmentation/attributes");
+  const data = await res.json();
+  if (Array.isArray(data.ukuran)) segAttrVocab = data;
+}
+
+async function setDetAttribute(det, key, value) {
+  const a = JSON.parse(JSON.stringify(det.correctedAttributes || det.attributes || { ukuran: null, warna: "normokrom", bentuk: [] }));
+  if (key === "bentuk") a.bentuk = a.bentuk.includes(value) ? a.bentuk.filter((b) => b !== value) : [...a.bentuk, value];
+  else a[key] = value || null;
+  const res = await fetch("/api/segmentation/attributes", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ attributes: a }),
+  });
+  const data = await res.json();
+  if (!data.ok) {
+    if (!data.offline) showError(data.message || "Gagal menghitung kelas turunan.");
+    return;
+  }
+  det.correctedAttributes = data.attributes;
+  setDetClass(det, data.classIndex);
 }

@@ -194,6 +194,8 @@ Sheet tambahan di file yang sama (dikonfirmasi 2026-11-23):
 
 Sheet Per kelas (precision, recall, F1) belum dibuat; ditambah bila diperlukan untuk evaluasi model.
 
+Status (2026-11-23, `feat/ui-v0.3.0`): file ini sudah dibuat (`/api/segmentation/export-comparison`, `segmentation/compare.py`). Kesepakatan dan kappa dihitung atas sel model yang sudah dinilai dokter (verdict, koreksi, atau dihapus); sel tambahan dokter dan sel belum direview tidak ikut. Atribut model pada sel yang dinilai lewat mode Satu kelas tercatat "tidak dinilai" (keputusan pengguna 2026-11-23). Perubahan data di bawah (`deletedByDoctor`, sel manual sebagai "tidak terdeteksi", `originalMask`) juga sudah dikerjakan.
+
 Catatan: tata letak blok mengikuti `label-asli.xlsx`, tetapi isinya satu label per kolom. Kalau nanti file ini mau dibaca pipeline dataset (`tambahan-dataset/skrip/rapikan_label.py`, yang mengharapkan Ukuran, Bentuk, dan Warna), pembacanya perlu disesuaikan di repo dataset.
 
 Perubahan data yang dibutuhkan (dikerjakan setelah v0.2.0):

@@ -93,6 +93,20 @@ document.querySelectorAll("dialog [data-close]").forEach((btn) =>
   btn.addEventListener("click", () => btn.closest("dialog").close())
 );
 segInspector.addEventListener("click", handleInspectorClick);
+document.getElementById("btnExportComparison").addEventListener("click", async () => {
+  if (!segActiveFolder) {
+    showToast("Buka satu hasil (atau proses satu folder) dulu supaya tahu folder yang mau dibandingkan.");
+    return;
+  }
+  const res = await fetch("/api/segmentation/export-comparison", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ folder: segActiveFolder, patientId: segPatientNameInput.value.trim() }),
+  });
+  const data = await res.json();
+  if (data.ok) showToast("File perbandingan tersimpan: " + data.filename);
+  else if (!data.offline) showError(data.message || "Gagal membuat file perbandingan.");
+});
 document.getElementById("btnPatientReport").addEventListener("click", () => {
   const patient = segPatientNameInput.value.trim();
   if (!segActiveFolder || !patient) {

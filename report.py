@@ -17,6 +17,8 @@ import numpy as np
 from flask import Blueprint, render_template, request
 
 from config import APP_VERSION, LOG_FILENAME, RBC_CLASS_LABELS, SCREENING_MIN_RBC
+from attributes import BENTUK
+from segmentation.compare import attribute_stats, cell_attributes, corrected_parts, pct
 from segmentation.storage import _latest_segmentation_rows, _load_model_config, active_detections
 from utils import safe_slug
 
@@ -40,12 +42,19 @@ def patient_report(folder, patient):
     counts = {label: 0 for label in RBC_CLASS_LABELS}
     total = reviewed = corrected = added = 0
     images = []
+    attr_list, attr_sources = [], {}
     for row in sorted(rows, key=lambda r: r.get("source_image") or ""):
         try:
             with open(os.path.join(folder, row.get("detail_file") or ""), encoding="utf-8") as f:
-                detections = active_detections(json.load(f).get("detections"))
+                detail = json.load(f)
         except (OSError, ValueError):
             continue
+        detections = active_detections(detail.get("detections"))
+        for d in detections:
+            attrs, source = cell_attributes(d, detail.get("labelMode", "single"))
+            attr_list.append(attrs)
+            if source:
+                attr_sources[source] = attr_sources.get(source, 0) + 1
         images.append(row.get("source_image"))
         for d in detections:
             label = d.get("correctedClassLabel") or d.get("classLabel")
@@ -53,8 +62,7 @@ def patient_report(folder, patient):
                 counts[label] += 1
             total += 1
             reviewed += 1 if d.get("doctorVerdict") else 0
-            idx = d.get("correctedClassIndex")
-            corrected += 1 if idx is not None and idx != d.get("classIndex") else 0
+            corrected += 1 if corrected_parts(d) else 0
             added += 1 if d.get("manual") else 0
 
     quality = {"baik": 0, "sedang": 0, "buram": 0, "lain": 0}
@@ -84,7 +92,20 @@ def patient_report(folder, patient):
         "classes": classes,
         "quality": quality,
         "examples": examples,
+        "attrs": _attr_rows(attribute_stats(attr_list)),
+        "attrSources": attr_sources,
     }
+
+
+def _attr_rows(st):
+    """Baris tabel atribut untuk laporan; kosong bila hasil bukan dari model atribut."""
+    n = st["n"]
+    if not n:
+        return None
+    rows = [(f"Ukuran {k}", st["ukuran"].get(k, 0)) for k in ("mikrosit", "normosit", "makrosit", "tidak diketahui")]
+    rows += [("Hipokrom", st["hipokrom"])]
+    rows += [(f"Bentuk {b}", st["bentuk"][b]) for b in BENTUK if st["bentuk"][b]]
+    return {"n": n, "rows": [{"label": k, "n": v, "pct": pct(v, n)} for k, v in rows if v or k.startswith("Ukuran") or k == "Hipokrom"]}
 
 
 @report_bp.route("/laporan")

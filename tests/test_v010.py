@@ -165,6 +165,7 @@ class TestRoutes(Base):
             "/api/rating/submit POST",
             "/api/recovery/capture GET,POST",
             "/api/segmentation/attributes GET,POST",
+            "/api/segmentation/export-comparison POST",
             "/api/segmentation/open-path POST",
             "/api/system/status GET",
             "/laporan GET",
@@ -288,8 +289,11 @@ class TestSegmentation(Base):
         rep = self.client.post("/api/segmentation/export-report", json={"folder": self.dir}).get_json()
         self.snap("export_report_response", rep)
         wb = load_workbook(rep["path"])
+        # Sheet v0.1.0 harus identik; sheet tambahan sesudahnya tercatat di sini.
+        added_sheets = ["Atribut per Pasien", "Koreksi per Sel"]
+        self.assertEqual(wb.sheetnames[-len(added_sheets):], added_sheets)
         self.snap("export_report_cells", {ws.title: [list(row) for row in ws.iter_rows(values_only=True)]
-                                          for ws in wb.worksheets})
+                                          for ws in wb.worksheets if ws.title not in added_sheets})
         wb.close()
 
         for only in (False, True):
@@ -298,6 +302,10 @@ class TestSegmentation(Base):
             with open(coco["path"], encoding="utf-8") as f:
                 content = json.load(f)
             self.assertEqual([c["name"] for c in content["categories"]], RBC_CLASS_LABELS)
+            # Field anotasi tambahan sesudah v0.1.0 (atribut, koreksi dokter) dilepas sebelum dibandingkan.
+            for ann in content["annotations"]:
+                for key in ("attributes", "attributes_source", "corrected_by_doctor", "added_by_doctor"):
+                    ann.pop(key, None)
             self.snap(f"export_coco_onlyReviewed={only}", {"response": coco, "content": content})
 
     def test_folder_summary(self):  # 2.8

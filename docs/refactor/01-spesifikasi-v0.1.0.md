@@ -113,3 +113,5 @@ Hanya penambahan field; field lama tidak berubah.
   - `GET /laporan?folder=&patient=`: laporan pasien siap cetak/PDF (UC-07, `report.py`);
   - `GET|POST /api/segmentation/attributes`: kosakata atribut dan kelas turunan (persiapan model multi-label, `attributes.py`);
   - `POST /api/segmentation/open-path {path}`: buka gambar sumber tanpa dialog, bentuk respons sama dengan `select-image`.
+- `POST /api/segmentation/export-comparison {folder, patientId?}`: file perbandingan sistem-dokter (F15).
+- Excel laporan: sheet tambahan "Atribut per Pasien" dan "Koreksi per Sel" sesudah tiga sheet v0.1.0 (yang tidak berubah). COCO: field anotasi opsional `attributes`, `attributes_source`, `corrected_by_doctor`, `added_by_doctor`. Tes snapshot membandingkan bagian v0.1.0 dan mencatat tambahan secara eksplisit.

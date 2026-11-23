@@ -96,8 +96,29 @@ kbd {
 .app {
   height: 100vh;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
 }
+.app-header { grid-row: 1; }
+.error-bar { grid-row: 2; }
+.view { grid-row: 3; }
+.status-bar { grid-row: 4; }
+
+/* Galat: tetap tampil sampai ditutup atau masalahnya pulih, dan dibedakan dari
+   toast sukses lewat judul "Gagal" dan garis tebal, tidak hanya warna. */
+.error-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 8px 14px 0;
+  padding: 6px 8px 6px 14px;
+  border-radius: 6px;
+  border-left: 6px solid var(--bad);
+  background: var(--bad-bg);
+  color: var(--ink);
+  font-size: 15px;
+}
+.error-title { color: var(--bad); }
+#errorText { flex: 1; }
 .app-header {
   display: flex;
   align-items: center;

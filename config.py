@@ -87,6 +87,16 @@ _CLIP_NEG_V2 = [
 
 # Berapa kali read() OpenCV boleh gagal berturut-turut sebelum dianggap
 OPENCV_DISCONNECT_THRESHOLD = 15
+
+# Kamera "terhubung" tapi isi frame tidak berubah sama sekali selama sekian
+# detik (selagi stream dibaca) dianggap beku. Sensor asli selalu punya derau,
+# jadi frame identik berturut-turut berarti driver/kamera macet. Frame yang
+# hampir seragam (lensa tertutup, gelap total) dikecualikan.
+CAMERA_FROZEN_SECONDS = 5.0
+
+# Sisa ruang minimum di folder tujuan sebelum menyimpan (byte), di luar
+# perkiraan ukuran file PNG-nya sendiri.
+SAVE_MIN_FREE_BYTES = 50 * 1024 * 1024
 LOG_FILENAME = "capture_log.csv"
 
 # Label kelas morfologi sel eritrosit untuk tab Segmentasi & Klasifikasi.

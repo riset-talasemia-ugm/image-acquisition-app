@@ -95,3 +95,10 @@ Variabel lingkungannya `CLIP_QUALITY`, `CLIP_MODEL`, dan `CLIP_PRETRAINED`. Cara
 - Model segmentasi masih mock.
 - Ambang fokus (`FOCUS_REL_GOOD/WARN`, `FOCUS_EDGE_RATIO_WARN`) masih heuristik dan belum dikalibrasi dengan label dokter.
 - Belum ada tes otomatis. Tes ini dibuat di Fase 0 rencana refactor.
+
+## Perubahan kontrak sesudah v0.1.0
+
+Hanya penambahan field; field lama tidak berubah.
+
+- `GET /api/camera/status`: field `frozen` (bool), true bila stream dibaca tetapi isi frame tidak berubah lebih dari `CAMERA_FROZEN_SECONDS` (branch `feat/ui-v0.3.0`).
+- `POST /api/save` saat gagal: field `code` (`folder`, `disk_full`, `permission`, `write`, `encode`) dan `message` yang menyebut penyebab. File PNG kini ditulis lewat `cv2.imencode` + `open()`; isinya sama dengan `cv2.imwrite`, tetapi path non-ASCII di Windows ikut berhasil.

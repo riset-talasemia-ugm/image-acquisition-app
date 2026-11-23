@@ -9,7 +9,7 @@ import time
 import cv2
 import numpy as np
 
-from config import OPENCV_DISCONNECT_THRESHOLD
+from config import CAMERA_FROZEN_SECONDS, OPENCV_DISCONNECT_THRESHOLD
 from quality import compute_focus_score
 
 
@@ -106,6 +106,11 @@ class CameraManager:
         self._opencv_connected = False
         self._opencv_read_failures = 0
 
+        # Deteksi stream beku (lihat is_frozen).
+        self._frame_sig = None
+        self._last_change_time = 0.0
+        self._last_read_time = 0.0
+
     def list_cameras(self, max_index=5):
         """Daftar kamera yang tersedia, gabungan SDK vendor ToupCam (kalau ada
         kamera yang cuma bisa dibaca lewat situ, mis. MiiCam di Linux) dan
@@ -190,6 +195,7 @@ class CameraManager:
                 cv_index = entry["cv_index"] if entry is not None else index
                 result = self._open_opencv_locked(cv_index, width, height)
 
+            self._frame_sig = None
             self.current_index = index if result.get("ok") else None
             self.current_width = result.get("width") if result.get("ok") else None
             self.current_height = result.get("height") if result.get("ok") else None
@@ -343,6 +349,7 @@ class CameraManager:
             if self.backend == "toupcam":
                 if not self._tc_connected or self._tc_handle is None:
                     return None
+                self._note_frame_locked(self.last_frame)
                 return self.last_frame
             if self.cap is None or not self.cap.isOpened():
                 return None
@@ -356,7 +363,30 @@ class CameraManager:
             self._opencv_read_failures = 0
             self._opencv_connected = True
             self.last_frame = frame
+            self._note_frame_locked(frame)
             return frame
+
+    def _note_frame_locked(self, frame):
+        """Catat kapan isi frame terakhir berubah. Sampel kasar (tiap 16 piksel)
+        cukup: derau sensor asli selalu mengubahnya antar frame."""
+        if frame is None:
+            return
+        now = time.monotonic()
+        self._last_read_time = now
+        sample = frame[::16, ::16]
+        sig = sample.tobytes()
+        # Frame hampir seragam (gelap, lensa tertutup) boleh identik; jangan dianggap beku.
+        if sig != self._frame_sig or int(sample.max()) - int(sample.min()) < 8:
+            self._frame_sig = sig
+            self._last_change_time = now
+
+    def is_frozen(self):
+        """True kalau stream sedang dibaca tetapi isinya tidak berubah lebih
+        dari CAMERA_FROZEN_SECONDS. Tidak dinilai kalau tidak ada yang membaca."""
+        if not self.is_connected() or self._frame_sig is None:
+            return False
+        now = time.monotonic()
+        return now - self._last_read_time < 2.0 and now - self._last_change_time > CAMERA_FROZEN_SECONDS
 
     def capture(self):
         with self.lock:

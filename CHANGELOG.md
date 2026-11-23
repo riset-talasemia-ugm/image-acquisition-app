@@ -14,6 +14,12 @@ Target rilis 0.2.0: refactor backend tanpa mengubah perilaku (lihat `docs/refact
 - Tampilan ditulis ulang mengikuti prototipe (`docs/ui/`): dua layar (Akuisisi, Analisis sel) dengan navigasi tahap, bar sesi, bar status, tema terang/gelap, font Atkinson Hyperlegible offline, tanpa scroll halaman.
 - Akuisisi: status fokus juga tampil di atas stream, tanda prasyarat (kamera, inisial, folder), alasan tombol Simpan mati ditulis.
 - Analisis: inspektur sel dengan tombol kelas dan verdict besar untuk layar sentuh, shortcut B (Benar) dan S (Salah) yang langsung pindah ke sel berikutnya, tombol "Tandai sisanya benar" juga di inspektur (alur v0.1.0: tandai yang salah, sisanya disetujui sekaligus), banner "alat bantu, bukan diagnosis" dan status model mock yang mencolok. Laporan/export dan pengaturan model pindah ke dialog.
+- Galat: bar galat persisten (judul "Gagal", tidak hilang sendiri) dengan tombol pemulihan (Coba hubungkan lagi, Sambungkan ulang kamera, Pilih lokasi lain, Coba simpan lagi). Server mati tampil sebagai "Terputus dari aplikasi" dan hilang sendiri saat tersambung lagi; tombol tidak macet dalam keadaan mati.
+- Ambil citra saat citra sebelumnya belum disimpan kini bertanya dulu (Simpan dulu, Buang, Batal).
+- Penghitung "Tersimpan sesi ini" menghitung citra sesi, terpisah dari nomor iterasi.
+- `/api/save` menyebut penyebab gagal (folder hilang, disk penuh, izin, gagal tulis) dalam field `code` dan `message`, dan menulis PNG lewat `cv2.imencode` sehingga path non-ASCII di Windows tidak gagal diam-diam.
+- `/api/camera/status` menambah field `frozen` (stream beku: isi frame tidak berubah lebih dari 5 detik); UI menampilkan peringatan dengan tombol sambung ulang.
+- Tes baru `tests/test_galat.py` (7 tes).
 - `static/js/app.js` dipecah apa adanya menjadi `common.js`, `capture.js`, `segmentation.js`, `main.js`. Backend tidak berubah.
 
 ### Added

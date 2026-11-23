@@ -8,6 +8,71 @@ const confirmModal = document.getElementById("confirmModal");
 const confirmModalMessage = document.getElementById("confirmModalMessage");
 const confirmModalActions = document.getElementById("confirmModalActions");
 
+const errorBar = document.getElementById("errorBar");
+const errorText = document.getElementById("errorText");
+const errorAction = document.getElementById("errorAction");
+let errorKey = null; // jenis galat yang sedang tampil, supaya bisa dihapus otomatis saat pulih
+
+// Galat tetap tampil sampai ditutup, dengan tombol pemulihan opsional
+// ({label, run}). `key` dipakai hideError untuk menghapusnya hanya bila galat
+// yang tampil masih galat yang sama.
+function showError(message, action = null, key = null) {
+  errorKey = key;
+  errorText.textContent = message;
+  errorAction.hidden = !action;
+  errorAction.onclick = action
+    ? () => {
+        hideError();
+        action.run();
+      }
+    : null;
+  if (action) errorAction.textContent = action.label;
+  errorBar.classList.remove("view-hidden");
+}
+
+function hideError(key = null) {
+  if (key && key !== errorKey) return;
+  errorBar.classList.add("view-hidden");
+  errorKey = null;
+}
+document.getElementById("errorClose").addEventListener("click", () => hideError());
+
+// Semua request lewat fetch ini. Kalau server tidak bisa dihubungi, pemanggil
+// menerima respons {ok:false, offline:true} alih-alih exception, jadi jalur
+// galat yang sudah ada di tiap pemanggil (termasuk mengaktifkan lagi tombol
+// yang dimatikan selama request) tetap jalan, dan pengguna melihat satu pesan
+// "Terputus dari aplikasi" yang hilang sendiri begitu server kembali.
+const nativeFetch = window.fetch.bind(window);
+let appOffline = false;
+let offlineProbe = null;
+window.fetch = async (...args) => {
+  try {
+    const res = await nativeFetch(...args);
+    if (appOffline) {
+      appOffline = false;
+      clearInterval(offlineProbe);
+      hideError("offline");
+      showToast("Tersambung lagi ke aplikasi.");
+    }
+    return res;
+  } catch (e) {
+    if (!appOffline) {
+      appOffline = true;
+      showError(
+        "Terputus dari aplikasi: server tidak merespons. Mungkin jendela run.bat tertutup atau perangkat tertidur. " +
+          "Jalankan lagi run.bat; citra yang sudah tersimpan aman.",
+        null,
+        "offline"
+      );
+      offlineProbe = setInterval(() => fetch("/api/camera/status"), 3000);
+    }
+    return new Response(
+      JSON.stringify({ ok: false, offline: true, message: "Terputus dari aplikasi." }),
+      { status: 503, headers: { "Content-Type": "application/json" } }
+    );
+  }
+};
+
 function showToast(message) {
   toast.textContent = message;
   toast.classList.remove("toast-hidden");
@@ -41,6 +106,9 @@ function showChoiceModal(message, choices) {
     });
 
     confirmModal.classList.remove("modal-hidden");
+    // Fokus ke pilihan utama supaya Enter/Spasi langsung memilihnya.
+    const primary = confirmModalActions.querySelector(".btn-primary") || confirmModalActions.lastChild;
+    if (primary) primary.focus();
   });
 }
 

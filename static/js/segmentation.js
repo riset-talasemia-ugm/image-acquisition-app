@@ -91,7 +91,9 @@ const MIN_CELL_RADIUS = 4;
 // -----------------------------------------------------------------------
 async function loadClassLegend() {
   const res = await fetch("/api/segmentation/classes");
-  segClassLabels = await res.json();
+  const classes = await res.json();
+  if (!Array.isArray(classes)) return; // server terputus
+  segClassLabels = classes;
   renderClassSummary(null);
   segBulkClassSelect.innerHTML = segClassLabels
     .map((c) => `<option value="${c.index}">${c.label}</option>`)
@@ -541,7 +543,7 @@ async function doSelectSegmentationImage() {
   btnSegSelectImage.textContent = "Pilih gambar";
   const data = await res.json();
   if (!data.ok) {
-    if (data.message) showToast(data.message);
+    if (data.message) showError(data.message);
     return;
   }
   segSelectedPath = data.path;
@@ -625,7 +627,7 @@ async function doLoadSegmentationResult() {
   btnLoadSegmentation.textContent = "Muat hasil tersimpan";
 
   if (!data.ok) {
-    if (data.message) showToast(data.message);
+    if (data.message) showError(data.message);
     return;
   }
   applyLoadedSegmentationResult(data);
@@ -644,7 +646,7 @@ async function doLoadSegmentationResultByPath(detailPath) {
   });
   const data = await res.json();
   if (!data.ok) {
-    showToast(data.message || "Gagal memuat hasil.");
+    if (!data.offline) showError(data.message || "Gagal memuat hasil.");
     return;
   }
   applyLoadedSegmentationResult(data);
@@ -880,7 +882,7 @@ async function doRunSegmentation() {
   btnRunSegmentation.textContent = "Jalankan segmentasi";
 
   if (!data.ok) {
-    showToast(data.message || "Gagal memproses.");
+    if (!data.offline) showError(data.message || "Gagal memproses segmentasi.");
     resetSegmentationResults();
     return;
   }
@@ -940,7 +942,7 @@ async function trySaveSegmentation(force) {
   btnSaveSegmentation.textContent = "Simpan hasil";
 
   if (!data.ok) {
-    showToast(data.message || "Gagal menyimpan hasil.");
+    if (!data.offline) showError(data.message || "Gagal menyimpan hasil.", { label: "Coba simpan lagi", run: doSaveSegmentation });
     return;
   }
 
@@ -1024,7 +1026,7 @@ async function doExportSegReport() {
   btnSegExportReport.textContent = "Export laporan (Excel)";
 
   if (!data.ok) {
-    showToast(data.message || "Gagal mengekspor laporan.");
+    if (!data.offline) showError(data.message || "Gagal mengekspor laporan.");
     return;
   }
   showToast("Laporan tersimpan: " + data.filename);
@@ -1055,7 +1057,8 @@ async function doExportSegDatasetCoco() {
   btnSegExportCoco.disabled = false;
   btnSegExportCoco.textContent = "Export dataset (COCO)";
 
-  showToast(data.message || (data.ok ? "Dataset tersimpan." : "Gagal mengekspor dataset."));
+  if (data.ok) showToast(data.message || "Dataset tersimpan.");
+  else if (!data.offline) showError(data.message || "Gagal mengekspor dataset.");
 }
 
 // Render daftar hasil yang bisa diklik -- setiap baris, kalau diklik,
@@ -1306,7 +1309,7 @@ async function doSaveSegModelConfig() {
   btnSegSaveModelConfig.disabled = false;
   btnSegSaveModelConfig.textContent = "Simpan";
   if (!data.ok) {
-    showToast(data.message || "Gagal menyimpan konfigurasi model.");
+    if (!data.offline) showError(data.message || "Gagal menyimpan konfigurasi model.");
     return;
   }
   if (data.lowConfidenceThreshold) {

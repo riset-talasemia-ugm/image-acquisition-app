@@ -54,11 +54,13 @@ let currentCaptureSavedAs = null; // nama file terakhir dari capture yang aktif 
 let currentCaptureFocus = null; // {status, relLow} kualitas fokus seluruh frame dari capture yang aktif (lihat /api/capture)
 let focusPollBusy = false; // cegah request /api/focus/live menumpuk
 let focusMapKey = null; // "ROWSxCOLS" peta tile yang sudah dibangun
+let cameraFrozenShown = false;
 let isCameraConnected = false; // dipakai checkCameraStatus() buat deteksi kamera dicabut fisik
 
 async function loadCameras() {
   const res = await fetch("/api/cameras");
   const cameras = await res.json();
+  if (!Array.isArray(cameras)) return; // server terputus, lihat fetch di common.js
   cameraSelect.innerHTML = "";
   if (cameras.length === 0) {
     const opt = document.createElement("option");
@@ -118,13 +120,20 @@ async function connectCamera() {
       ? cameraSelect.options[cameraSelect.selectedIndex].text
       : "index " + data.index;
     applyConnectedUI(selectedName, data.width, data.height);
+    hideError("camera");
   } else {
     cameraDot.className = "dot dot-off";
     cameraLabel.textContent = "Gagal menghubungkan kamera";
     if (btnCameraSettings) btnCameraSettings.disabled = true;
     isCameraConnected = false;
     updateSaveButtonState();
-    showToast(data.message || "Tidak bisa membuka kamera index " + index);
+    if (data.offline) return;
+    showError(
+      (data.message || "Tidak bisa membuka kamera index " + index) +
+        " Cek kabel USB dan pastikan kamera tidak dipakai aplikasi lain.",
+      { label: "Coba hubungkan lagi", run: connectCamera },
+      "camera"
+    );
   }
 }
 
@@ -139,7 +148,11 @@ function handleCameraDisconnected() {
   focusCard.classList.add("focus-card-hidden");
   streamChip.classList.add("view-hidden");
   updateSaveButtonState();
-  showToast("Koneksi ke kamera terputus. Cek kabel USB, lalu klik Hubungkan lagi.");
+  showError(
+    "Koneksi ke kamera terputus. Cek kabel USB kamera, lalu sambungkan ulang.",
+    { label: "Sambungkan ulang kamera", run: connectCamera },
+    "camera"
+  );
 }
 
 async function checkCameraStatus() {
@@ -147,7 +160,23 @@ async function checkCameraStatus() {
   try {
     const res = await fetch("/api/camera/status");
     const data = await res.json();
-    if (!data.connected) handleCameraDisconnected();
+    if (data.offline) return; // galat koneksi ke server sudah ditangani di common.js
+    if (!data.connected) {
+      handleCameraDisconnected();
+      return;
+    }
+    // Stream beku: tampilkan sekali per kejadian, hapus sendiri bila pulih.
+    if (data.frozen && !cameraFrozenShown) {
+      cameraFrozenShown = true;
+      showError(
+        "Gambar kamera tidak berubah beberapa detik (stream beku). Cabut lalu pasang lagi kabel USB kamera, kemudian sambungkan ulang.",
+        { label: "Sambungkan ulang kamera", run: connectCamera },
+        "frozen"
+      );
+    } else if (!data.frozen && cameraFrozenShown) {
+      cameraFrozenShown = false;
+      hideError("frozen");
+    }
   } catch (e) {
     // Abaikan error jaringan sesaat, biar nggak salah nganggep disconnect
     // gara-gara satu request gagal doang.
@@ -185,7 +214,7 @@ async function openCameraSettings() {
   btnCameraSettings.textContent = "Pengaturan driver";
 
   if (!data.ok) {
-    showToast(data.message || "Gagal membuka dialog pengaturan kamera.");
+    showError(data.message || "Gagal membuka dialog pengaturan kamera.");
     return;
   }
   const selectedName = cameraSelect.options[cameraSelect.selectedIndex]
@@ -445,12 +474,34 @@ async function fetchCaptureClip(captureId) {
 }
 
 async function doCapture() {
+  // Citra yang belum disimpan tidak boleh hilang diam-diam (mis. Spasi tertekan
+  // tidak sengaja sebelum Simpan).
+  if (hasCapturedImage && !currentCaptureSaved) {
+    const choice = await showChoiceModal(
+      "Citra sebelumnya belum disimpan. Kalau mengambil citra baru, citra itu hilang.",
+      [
+        { label: "Batal", value: null },
+        { label: "Buang dan ambil baru", value: "discard" },
+        { label: "Simpan dulu, lalu ambil", value: "save", primary: true },
+      ]
+    );
+    if (!choice) return;
+    if (choice === "save") {
+      if (btnSave.disabled) {
+        showToast(saveHint.textContent || "Citra belum bisa disimpan.");
+        return;
+      }
+      await doSave();
+      if (!currentCaptureSaved) return;
+    }
+  }
   const res = await fetch("/api/capture", { method: "POST" });
   const data = await res.json();
   if (!data.ok) {
-    showToast(data.message || "Gagal capture.");
+    if (!data.offline) showError(data.message || "Gagal mengambil citra.", null, "capture");
     return;
   }
+  hideError("capture");
   captureBody.innerHTML = `<img src="data:image/png;base64,${data.image}" alt="hasil capture" />`;
   captureBadge.textContent = "Belum Tersimpan";
   captureBadge.className = "badge badge-unsaved";
@@ -704,9 +755,20 @@ async function doSave() {
   });
   const data = await res.json();
   if (!data.ok) {
-    showToast(data.message || "Gagal menyimpan.");
+    // Citra tetap tampil dengan status "Belum Tersimpan"; tawarkan pemulihan sesuai penyebab.
+    const folderProblem = ["folder", "permission", "disk_full"].includes(data.code);
+    if (!data.offline) {
+      showError(
+        data.message || "Gagal menyimpan.",
+        folderProblem
+          ? { label: "Pilih lokasi lain", run: doSelectFolder }
+          : { label: "Coba simpan lagi", run: doSave },
+        "save"
+      );
+    }
     return;
   }
+  hideError("save");
   captureBadge.textContent = "Tersimpan";
   captureBadge.className = "badge badge-saved";
   captureFilename.textContent = data.filename;
@@ -719,6 +781,7 @@ async function doSave() {
   lastSavedFullPath = data.path;
   btnSendToSegmentation.disabled = false;
   if (lastCapturedImage) addToGallery(data.filename, lastCapturedImage);
+  document.getElementById("sessionCount").textContent = galleryEntries.length;
   loadFolderSummary({ forceShow: false });
 }
 

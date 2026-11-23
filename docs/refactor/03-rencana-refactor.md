@@ -108,7 +108,7 @@ Data di folder akuisisi tidak ikut terpengaruh, karena refactor tidak mengubah f
 
 Catat di sini bug atau ide yang ditemukan selama refactor, jangan langsung diperbaiki.
 
-- `doCapture` langsung mengganti citra aktif, dan server menimpa `captured_frame` tanpa peringatan. Spasi yang tertekan tidak sengaja sebelum Simpan membuat citra hilang tanpa jejak (K-A3). Ditemukan di skenario lama.
-- `fetch` di `doCapture`/`doSave` tidak dibungkus `try/catch`. Kalau server mati, UI diam tanpa pesan (K-C5).
-- `/api/save` hanya mengembalikan "Gagal menyimpan file." tanpa penyebab, karena `cv2.imwrite` tidak memberi alasan (K-C2).
-- Penghitung "Jumlah gambar tercapture" menampilkan nomor iterasi terakhir dari file, bukan jumlah sesi (K-A5).
+- **Selesai (feat/ui-v0.3.0):** `doCapture` langsung mengganti citra aktif, dan server menimpa `captured_frame` tanpa peringatan. Spasi yang tertekan tidak sengaja sebelum Simpan membuat citra hilang tanpa jejak (K-A3). Ditemukan di skenario lama.
+- **Selesai:** `fetch` di `doCapture`/`doSave` tidak dibungkus `try/catch`. Kalau server mati, UI diam tanpa pesan (K-C5).
+- **Selesai:** `/api/save` hanya mengembalikan "Gagal menyimpan file." tanpa penyebab, karena `cv2.imwrite` tidak memberi alasan (K-C2).
+- **Selesai:** Penghitung "Jumlah gambar tercapture" menampilkan nomor iterasi terakhir dari file, bukan jumlah sesi (K-A5).

@@ -3,6 +3,7 @@
 import json
 import os
 import re
+import shutil
 import threading
 from datetime import datetime
 
@@ -19,6 +20,7 @@ from config import (
     FOCUS_REL_WARN,
     FOCUS_TILE_COLS,
     FOCUS_TILE_ROWS,
+    SAVE_MIN_FREE_BYTES,
 )
 from csvlog import log_capture_csv, save_lock
 from quality import analyze_focus_safe, clip_quality, compute_focus_score, focus_tracker, is_blank_frame
@@ -99,6 +101,7 @@ def api_camera_status():
         "index": camera.current_index if connected else None,
         "width": camera.current_width if connected else None,
         "height": camera.current_height if connected else None,
+        "frozen": camera.is_frozen(),
     })
 
 
@@ -237,8 +240,14 @@ def api_save():
 
     if not patient_name:
         return jsonify({"ok": False, "message": "Nama pasien belum diisi."}), 400
-    if not folder or not os.path.isdir(folder):
-        return jsonify({"ok": False, "message": "Lokasi penyimpanan belum valid."}), 400
+    if not folder:
+        return jsonify({"ok": False, "code": "folder", "message": "Lokasi penyimpanan belum dipilih."}), 400
+    if not os.path.isdir(folder):
+        return jsonify({
+            "ok": False, "code": "folder",
+            "message": f"Folder simpan tidak ditemukan ({folder}). Mungkin flashdisk dicabut atau folder "
+                       "dipindah/dihapus. Pilih lokasi simpan lagi.",
+        }), 400
     if camera.captured_frame is None:
         return jsonify({"ok": False, "message": "Belum ada gambar yang di-capture."}), 400
 
@@ -270,9 +279,9 @@ def api_save():
         filename = f"{slug}_{timestamp}_{iterasi:02d}.png"
         full_path = os.path.join(folder, filename)
 
-        ok = cv2.imwrite(full_path, frame_to_save)
-        if not ok:
-            return jsonify({"ok": False, "message": "Gagal menyimpan file."}), 500
+        problem = write_png(full_path, frame_to_save)
+        if problem:
+            return jsonify({"ok": False, **problem}), 500
 
         height, width = frame_to_save.shape[:2]
         quality = camera.captured_quality or {}
@@ -317,6 +326,46 @@ def api_save():
             "height": height,
         }
     )
+
+
+def write_png(path, frame):
+    """Tulis frame sebagai PNG. Mengembalikan None kalau berhasil, atau
+    {"code", "message"} yang menyebut penyebab dan langkah berikutnya.
+
+    Pakai imencode + open() alih-alih cv2.imwrite: isi PNG sama, tetapi
+    imwrite gagal diam-diam (cuma False) untuk path non-ASCII di Windows dan
+    tidak pernah memberi tahu kenapa gagal.
+    """
+    folder = os.path.dirname(path)
+    ok, buf = cv2.imencode(".png", frame)
+    if not ok:
+        return {"code": "encode", "message": "Gagal mengubah citra ke PNG. Coba ambil citra lagi."}
+    if not os.path.isdir(folder):
+        return {"code": "folder", "message": "Folder simpan hilang (flashdisk dicabut atau folder dipindah). Pilih lokasi simpan lagi."}
+    try:
+        free = shutil.disk_usage(folder).free
+    except OSError:
+        free = None
+    if free is not None and free < len(buf) + SAVE_MIN_FREE_BYTES:
+        return {
+            "code": "disk_full",
+            "message": f"Ruang disk hampir penuh (sisa {free // (1024 * 1024)} MB). "
+                       "Kosongkan disk atau pilih lokasi simpan lain.",
+        }
+    if not os.access(folder, os.W_OK):
+        return {"code": "permission", "message": "Tidak punya izin menulis ke folder ini. Pilih lokasi simpan lain."}
+    try:
+        with open(path, "wb") as f:
+            f.write(buf.tobytes())
+    except OSError as e:
+        # File setengah jadi jangan ditinggal: iterasi berikutnya dihitung dari isi folder.
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+        reason = {28: "disk penuh", 13: "izin ditolak", 2: "folder hilang"}.get(e.errno, e.strerror or str(e))
+        return {"code": "write", "message": f"Gagal menulis file ({reason}). Cek folder simpan, lalu coba simpan lagi."}
+    return None
 
 
 @capture_bp.route("/api/folder-summary")

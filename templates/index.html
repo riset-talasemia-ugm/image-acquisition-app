@@ -35,6 +35,13 @@
         </div>
       </header>
 
+      <div id="errorBar" class="error-bar view-hidden" role="alert">
+        <strong class="error-title">Gagal</strong>
+        <span id="errorText"></span>
+        <button id="errorAction" type="button" class="btn btn-secondary" hidden></button>
+        <button id="errorClose" type="button" class="btn btn-quiet btn-square" aria-label="Tutup pesan">&times;</button>
+      </div>
+
       <!-- ================================================================ -->
       <!-- Layar 1: Akuisisi                                                  -->
       <!-- ================================================================ -->
@@ -141,7 +148,7 @@
 
         <section class="film" aria-label="Citra tersimpan sesi ini">
           <div class="film-meta">
-            <strong>Tersimpan sesi ini</strong>
+            <strong>Tersimpan sesi ini: <span id="sessionCount">0</span></strong>
             <span class="muted small">Iterasi terakhir: <span id="captureCount">0</span></span>
             <span class="muted small">Nama file: inisial_waktu_iterasi.png</span>
           </div>

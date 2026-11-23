@@ -474,6 +474,17 @@ input::placeholder { color: var(--muted); opacity: 0.8; }
 }
 .seg-overlay-wrap.seg-add-mode-active svg polygon { cursor: crosshair; }
 .seg-overlay-wrap svg polygon.seg-polygon-active { stroke-width: 5; stroke: #fff; }
+/* Penanda koreksi dokter: bentuk berbeda (lingkaran / belah ketupat), bukan hanya warna. */
+.seg-overlay-wrap svg .seg-mark { fill: #fff; stroke: #111; stroke-width: 2; pointer-events: none; }
+#segResultBody { position: relative; } /* legenda tidak ikut zoom/pan */
+.seg-legend { position: absolute; right: 8px; bottom: 8px; display: flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 4px; background: var(--panel); font-size: 12px; color: var(--muted); }
+.mark-dot, .mark-diamond, .mark-dash { display: inline-block; width: 10px; height: 10px; border: 2px solid var(--ink); background: #fff; flex: none; }
+.mark-dot { border-radius: 50%; }
+.mark-diamond { transform: rotate(45deg); width: 8px; height: 8px; margin: 0 2px; }
+.mark-dash { width: 16px; height: 0; border-width: 2px 0 0; border-style: dashed; background: none; }
+.corrected-line { margin-top: 4px; color: var(--ink); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.attr-btn small { font-weight: 400; color: var(--muted); }
+.attr-changed { border-style: dashed; }
 .seg-overlay-wrap svg polygon.seg-polygon-dimmed { opacity: 0.15; }
 .seg-overlay-wrap svg text.seg-label-dimmed { opacity: 0.15; }
 

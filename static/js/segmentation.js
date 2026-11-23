@@ -639,6 +639,24 @@ function polygonCentroid(mask) {
   return [sumX / n, sumY / n];
 }
 
+// Bagian hasil model yang ditimpa dokter: "kelas" dan, untuk model atribut,
+// "ukuran"/"warna"/"bentuk". Sel tambahan dokter (manual) bukan koreksi.
+function correctedParts(d) {
+  if (d.manual) return [];
+  const parts = [];
+  if (d.correctedClassIndex !== null && d.correctedClassIndex !== undefined && d.correctedClassIndex !== d.classIndex) {
+    parts.push("kelas");
+  }
+  const m = d.attributes;
+  const c = d.correctedAttributes;
+  if (m && c) {
+    if ((m.ukuran || null) !== (c.ukuran || null)) parts.push("ukuran");
+    if ((m.warna || null) !== (c.warna || null)) parts.push("warna");
+    if ([...m.bentuk].sort().join() !== [...c.bentuk].sort().join()) parts.push("bentuk");
+  }
+  return parts;
+}
+
 function renderSegmentationOverlay() {
   const colorFor = (idx) => (segClassLabels[idx] ? segClassLabels[idx].color : "#64748b");
   // Ukuran font label nomor diskalakan relatif ke dimensi gambar (bukan
@@ -659,6 +677,13 @@ function renderSegmentationOverlay() {
     // supaya user gampang korelasikan mask di gambar dengan baris di daftar --
     // bisa disembunyikan lewat checkbox "Tampilkan Nomor Sel" (segShowCellNumbers)
     // kalau lagi mengganggu pandangan pas menilai gambar polos.
+    const [bx, by, bw] = d.bbox;
+    const mr = numberFontSize * 0.42;
+    if (d.manual) {
+      labels += `<rect class="seg-mark" data-cell-id="${d.id}" x="${bx + bw - mr}" y="${by - mr}" width="${mr * 1.6}" height="${mr * 1.6}" transform="rotate(45 ${bx + bw - mr * 0.2} ${by - mr * 0.2})" />`;
+    } else if (correctedParts(d).length) {
+      labels += `<circle class="seg-mark" data-cell-id="${d.id}" cx="${bx + bw}" cy="${by}" r="${mr}" />`;
+    }
     if (segShowCellNumbers) {
       const [cx, cy] = polygonCentroid(d.mask);
       labels += `<text class="seg-cell-number-label" data-cell-id="${d.id}" x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="middle" font-size="${numberFontSize}">${i + 1}</text>`;
@@ -669,6 +694,7 @@ function renderSegmentationOverlay() {
       <img src="${segCurrentImageDataUrl}" alt="hasil segmentasi" />
       <svg viewBox="0 0 ${segImgW} ${segImgH}" preserveAspectRatio="xMidYMid meet">${polygons}${labels}</svg>
     </div>
+    <div class="seg-legend" aria-hidden="true"><span class="mark-dot"></span> dikoreksi dokter <span class="mark-diamond"></span> ditambah dokter <span class="mark-dash"></span> keyakinan rendah</div>
   `;
   applySegZoomTransform();
   applySegClassHighlightToOverlay();
@@ -779,11 +805,8 @@ function renderDetectionsList() {
       const options = segClassLabels
         .map((c) => `<option value="${c.index}" ${c.index === selectedIdx ? "selected" : ""}>${c.label}</option>`)
         .join("");
-      const corrected =
-        d.correctedClassIndex !== null &&
-        d.correctedClassIndex !== undefined &&
-        d.correctedClassIndex !== d.classIndex
-          ? ' <span class="seg-corrected-tag">dikoreksi</span>'
+      const corrected = correctedParts(d).length
+          ? ` <span class="seg-corrected-tag">dikoreksi: ${correctedParts(d).join(", ")}</span>`
           : "";
       const manualTag = d.manual ? ' <span class="seg-manual-tag">manual</span>' : "";
       const lowConf =
@@ -1453,11 +1476,14 @@ function renderInspector() {
   const idx = currentClassIndex(det);
   const model = segClassLabels[det.classIndex];
   const lowConf = !det.manual && det.confidence < segLowConfidenceThreshold;
+  const parts = correctedParts(det);
   const tags = [
-    det.manual ? "manual" : `yakin ${Math.round(det.confidence * 100)}%`,
+    det.manual ? "ditambah dokter" : `yakin ${Math.round(det.confidence * 100)}%`,
     lowConf ? "keyakinan rendah" : "",
-    idx !== det.classIndex ? "dikoreksi" : "",
   ].filter(Boolean).join(", ");
+  const doctorLine = parts.length
+    ? `<div class="corrected-line"><span class="mark-dot"></span> Dikoreksi dokter (${parts.join(", ")}): <strong>${segClassLabels[idx] ? segClassLabels[idx].label : "-"}</strong></div>`
+    : "";
   const attrs = det.correctedAttributes || det.attributes || null;
   const attrText = (a) =>
     a ? `ukuran ${a.ukuran || "tidak diketahui"}, warna ${a.warna || "tidak diketahui"}, bentuk ${a.bentuk.length ? a.bentuk.join(" + ") : "normal"}` : "";
@@ -1471,7 +1497,9 @@ function renderInspector() {
     values
       .map((v) => {
         const on = multi ? cur.bentuk.includes(v) : cur[key] === v;
-        return `<button type="button" class="btn attr-btn" data-action="attr" data-key="${key}" data-value="${v}" aria-pressed="${on}">${v}</button>`;
+        const fromModel = det.attributes && (multi ? det.attributes.bentuk.includes(v) : det.attributes[key] === v);
+        const changed = det.attributes && det.correctedAttributes && on !== fromModel;
+        return `<button type="button" class="btn attr-btn${changed ? " attr-changed" : ""}" data-action="attr" data-key="${key}" data-value="${v}" aria-pressed="${on}" title="${fromModel ? "pilihan model" : ""}">${v}${fromModel ? " <small>(model)</small>" : ""}</button>`;
       })
       .join("");
   const attrPanel = segAttrVocab
@@ -1502,7 +1530,7 @@ function renderInspector() {
     </div>
     <div class="cell-head">
       <canvas id="cellCrop" class="cell-crop" width="144" height="144" role="img" aria-label="Potongan citra sel ${n}, diperbesar"></canvas>
-      <div class="muted small">Kelas dari model:<br /><strong>${det.manual ? "tidak ada (sel manual)" : model ? model.label : "-"}</strong><br />${tags}</div>
+      <div class="muted small">Kelas dari model:<br /><strong>${det.manual ? "tidak ada (ditambah dokter)" : model ? model.label : "-"}</strong><br />${tags}${doctorLine}</div>
     </div>
     ${modeToggle}
     ${segLabelMode === "attributes" ? attrPanel : `<div class="class-grid" role="group" aria-label="Kelas sel">${classButtons}</div>`}

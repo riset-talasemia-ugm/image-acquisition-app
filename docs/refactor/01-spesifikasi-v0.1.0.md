@@ -101,6 +101,7 @@ Variabel lingkungannya `CLIP_QUALITY`, `CLIP_MODEL`, dan `CLIP_PRETRAINED`. Cara
 Hanya penambahan field; field lama tidak berubah.
 
 - Deteksi: field opsional `attributes` {`ukuran`, `warna`, `bentuk`} dari model multi-label dan `correctedAttributes` dari review dokter; `classIndex`/`correctedClassIndex` tetap kelas (turunan). File detail mendapat `labelMode: "attributes"` hanya untuk review mode atribut.
+- Deteksi: `deletedByDoctor: true` untuk sel yang dihapus dokter (tetap di file detail, tidak dihitung di mana pun) dan `originalMask` bila ukuran sel diubah.
 - `model-status`/`model-config`: field `outputType` (`single` | `attributes`).
 
 - `GET /api/camera/status`: field `frozen` (bool), true bila stream dibaca tetapi isi frame tidak berubah lebih dari `CAMERA_FROZEN_SECONDS` (branch `feat/ui-v0.3.0`).

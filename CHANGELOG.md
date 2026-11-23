@@ -22,6 +22,7 @@ Target rilis 0.2.0: refactor backend tanpa mengubah perilaku (lihat `docs/refact
 - Tes baru `tests/test_galat.py` (7 tes).
 
 ### Fixed (target 0.3.0)
+- Sel yang dihapus dokter dulu dibuang dari data, sehingga deteksi salah model tidak tercatat. Kini disimpan dengan `deletedByDoctor: true` di file detail, disembunyikan di UI, dan tidak dihitung (jumlah sel, log, laporan, Excel, COCO; helper `active_detections`). Mask asli model disimpan di `originalMask` saat ukuran sel diubah.
 - Menyimpan review dokter yang hanya menambah verdict (tanpa mengubah kelas) dianggap "duplikat" dan bisa batal tersimpan bila pengguna menekan Batal. Cek duplikat kini membandingkan isi deteksi lengkap dengan file tersimpan terakhir (ada sejak v0.1.0).
 - Spasi saat modal konfirmasi terbuka menekan tombol yang disorot (mis. "tetap simpan" citra buram). Kini Spasi diabaikan di modal, Enter memilih (juga setelah klik di luar kotak), Esc membatalkan.
 - "Kirim ke analisis" tetap aktif setelah capture baru yang belum disimpan dan mengirim citra lama. Kini dimatikan sampai citra baru disimpan.

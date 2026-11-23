@@ -24,7 +24,7 @@ from segmentation import segmentation_bp
 from segmentation.mock_model import generate_mock_instance_segmentation
 from attributes import BENTUK, UKURAN, WARNA, clean, derived_class_index
 from rating import rating_summary
-from segmentation.storage import _latest_segmentation_rows, _load_model_config, _load_segmentation_detail_file
+from segmentation.storage import active_detections, _latest_segmentation_rows, _load_model_config, _load_segmentation_detail_file
 from utils import frame_to_png_base64
 
 
@@ -282,8 +282,9 @@ def api_segmentation_save():
     source_image_basename = os.path.basename(path)
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
 
+    counted = active_detections(detections)  # tanpa sel yang dihapus dokter
     class_counts = {label: 0 for label in RBC_CLASS_LABELS}
-    for d in detections:
+    for d in counted:
         label = d.get("correctedClassLabel") or d.get("classLabel")
         if label in class_counts:
             class_counts[label] += 1
@@ -291,8 +292,8 @@ def api_segmentation_save():
     # Agregasi penilaian dokter per sel (doctorVerdict: "correct"/"incorrect"/
     # null kalau belum direview) -- dipakai buat kolom ringkasan di
     # segmentation_log.csv & laporan Excel (lihat api_segmentation_export_report).
-    doctor_correct_count = sum(1 for d in detections if d.get("doctorVerdict") == "correct")
-    doctor_incorrect_count = sum(1 for d in detections if d.get("doctorVerdict") == "incorrect")
+    doctor_correct_count = sum(1 for d in counted if d.get("doctorVerdict") == "correct")
+    doctor_incorrect_count = sum(1 for d in counted if d.get("doctorVerdict") == "incorrect")
     doctor_reviewed_count = doctor_correct_count + doctor_incorrect_count
 
     with segmentation_log_lock:
@@ -323,7 +324,7 @@ def api_segmentation_save():
                         int(prev_row.get("doctor_correct_count") or 0) == doctor_correct_count
                         and int(prev_row.get("doctor_incorrect_count") or 0) == doctor_incorrect_count
                     )
-                    is_duplicate = counts_match and verdicts_match and prev_total == len(detections)
+                    is_duplicate = counts_match and verdicts_match and prev_total == len(counted)
                 except (TypeError, ValueError):
                     is_duplicate = False
             if is_duplicate:
@@ -373,7 +374,7 @@ def api_segmentation_save():
             "patient_id": patient_id or "?",
             "source_image": source_image_basename,
             "detail_file": detail_filename,
-            "total_cells": len(detections),
+            "total_cells": len(counted),
             "is_duplicate": "1" if is_duplicate else "0",
             "duplicate_of": duplicate_of,
             "doctor_reviewed_count": doctor_reviewed_count,
@@ -394,7 +395,7 @@ def api_segmentation_save():
         "ok": True,
         "detailPath": detail_path,
         "logPath": log_path,
-        "totalCells": len(detections),
+        "totalCells": len(counted),
         "isDuplicate": is_duplicate,
     })
 

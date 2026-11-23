@@ -63,6 +63,13 @@ def _load_model_config():
     return config
 
 
+def active_detections(detections):
+    """Deteksi yang dihitung: sel yang dihapus dokter (deletedByDoctor) tetap
+    tersimpan sebagai deteksi salah model untuk perbandingan F15, tetapi tidak
+    ikut jumlah sel, kelas, laporan, maupun dataset."""
+    return [d for d in (detections or []) if not d.get("deletedByDoctor")]
+
+
 def _load_segmentation_detail_file(detail_path):
     """Logic bersama buat baca satu file JSON hasil segmentasi + coba baca
     ulang gambar sumbernya buat preview. Dipakai baik dari dialog

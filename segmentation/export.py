@@ -9,7 +9,7 @@ from flask import jsonify, request
 
 from config import RBC_CLASS_LABELS
 from segmentation import segmentation_bp
-from segmentation.storage import _latest_segmentation_rows, _load_model_config
+from segmentation.storage import _latest_segmentation_rows, _load_model_config, active_detections
 from utils import safe_slug
 
 
@@ -117,7 +117,7 @@ def api_segmentation_export_report():
                 detail = json.load(f)
         except (OSError, json.JSONDecodeError):
             continue
-        for i, d in enumerate(detail.get("detections") or []):
+        for i, d in enumerate(active_detections(detail.get("detections"))):
             corrected_idx = d.get("correctedClassIndex")
             has_correction = corrected_idx is not None and corrected_idx != d.get("classIndex")
             verdict = {"correct": "Benar", "incorrect": "Salah"}.get(d.get("doctorVerdict"), "-")
@@ -242,7 +242,7 @@ def api_segmentation_export_coco():
             "height": height,
         })
 
-        for d in (detail.get("detections") or []):
+        for d in active_detections(detail.get("detections")):
             corrected_idx = d.get("correctedClassIndex")
             has_correction = corrected_idx is not None and corrected_idx != d.get("classIndex")
             label = d.get("correctedClassLabel") if has_correction else d.get("classLabel")

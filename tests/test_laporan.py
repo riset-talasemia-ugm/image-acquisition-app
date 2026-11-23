@@ -61,5 +61,31 @@ class TestLaporan(unittest.TestCase):
         self.assertEqual(self.client.get("/laporan").status_code, 400)
 
 
+
+class TestSelDihapusDokter(unittest.TestCase):
+    def test_tersimpan_tapi_tidak_dihitung(self):
+        import csv
+        import json
+        with tempfile.TemporaryDirectory() as folder:
+            client = app.test_client()
+            path = os.path.join(folder, "ab-12_20261123-100000_01.png")
+            write_png(path, np.random.default_rng(0).integers(0, 255, (60, 80, 3), dtype=np.uint8))
+            gone = det(1, 0, "Normal cell")
+            gone["deletedByDoctor"] = True
+            res = client.post("/api/segmentation/save", json={
+                "path": path, "patientId": "AB-12", "detections": [det(0, 0, "Normal cell"), gone]}).get_json()
+            self.assertEqual(res["totalCells"], 1)
+            with open(os.path.join(folder, "segmentation_log.csv"), newline="", encoding="utf-8") as f:
+                row = list(csv.DictReader(f))[-1]
+            self.assertEqual(row["total_cells"], "1")
+            with open(os.path.join(folder, row["detail_file"]), encoding="utf-8") as f:
+                self.assertEqual(len(json.load(f)["detections"]), 2)  # tetap tercatat untuk F15
+            self.assertEqual(patient_report(folder, "AB-12")["total"], 1)
+            coco = client.post("/api/segmentation/export-coco", json={"folder": folder, "onlyReviewed": False}).get_json()
+            self.assertTrue(coco["ok"])
+            with open(os.path.join(folder, coco["filename"]), encoding="utf-8") as f:
+                self.assertEqual(len(json.load(f)["annotations"]), 1)
+
+
 if __name__ == "__main__":
     unittest.main()

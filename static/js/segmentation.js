@@ -384,6 +384,7 @@ function resizeActiveCell(factor) {
   const newRadius = avgRadius * factor;
   if (newRadius < MIN_CELL_RADIUS || newRadius > maxRadius) return; // di luar batas, batalkan
 
+  if (!det.manual && !det.originalMask) det.originalMask = det.mask.map((p) => [...p]); // mask asli model
   const newMask = det.mask.map(([x, y]) => [
     Math.round(cx + (x - cx) * factor),
     Math.round(cy + (y - cy) * factor),
@@ -399,7 +400,21 @@ function resizeActiveCell(factor) {
   renderDetectionsList();
 }
 
+// Sel yang dihapus dokter tidak dibuang: disimpan dengan deletedByDoctor supaya
+// tercatat sebagai deteksi salah model (F15). Sel tambahan dokter yang dihapus
+// lagi memang dibuang.
+let segDeleted = [];
+function segAllDetections() {
+  return segDetections.concat(segDeleted);
+}
+function splitDeleted(list) {
+  segDeleted = list.filter((d) => d.deletedByDoctor);
+  return list.filter((d) => !d.deletedByDoctor);
+}
+
 function deleteDetection(cellId) {
+  const removed = segDetections.find((d) => d.id === cellId);
+  if (removed && !removed.manual) segDeleted.push({ ...removed, deletedByDoctor: true });
   segDetections = segDetections.filter((d) => d.id !== cellId);
   if (segActiveCellId === cellId) segActiveCellId = null;
   segSelectedCellIds.delete(cellId);
@@ -447,6 +462,7 @@ function updateCellSizeButtonsState() {
 
 function resetSegmentationResults() {
   segDetections = [];
+  segDeleted = [];
   updateSegTotalCellCount();
   segHighlightedClassIndex = null;
   segActiveCellId = null;
@@ -520,13 +536,13 @@ function applyLoadedSegmentationResult(data) {
     ? "Gambar: " + data.path + (data.detailFile ? ` (dimuat dari ${data.detailFile})` : "")
     : `Dimuat dari ${data.detailFile} (path gambar sumber tidak tercatat)`;
 
-  segDetections = (data.detections || []).map((d) => ({
+  segDetections = splitDeleted(data.detections || []).map((d) => ({
     ...d,
     correctedClassIndex: d.correctedClassIndex ?? null,
     correctedClassLabel: d.correctedClassLabel ?? null,
     doctorVerdict: d.doctorVerdict ?? null, // kompatibel dgn file lama sblm fitur ini ada
   }));
-  segCleanJson = JSON.stringify(segDetections);
+  segCleanJson = JSON.stringify(segAllDetections());
   if (data.labelMode) segLabelMode = data.labelMode;
   segActiveCellId = null;
   updateCellSizeButtonsState();
@@ -723,7 +739,7 @@ function updateSegTotalCellCount() {
 let segCleanJson = null;
 
 function saveSegDraft() {
-  if (!segSelectedPath || segDetections.length === 0 || JSON.stringify(segDetections) === segCleanJson) {
+  if (!segSelectedPath || segDetections.length === 0 || JSON.stringify(segAllDetections()) === segCleanJson) {
     localStorage.removeItem("adt-seg-draft");
     return;
   }
@@ -732,7 +748,7 @@ function saveSegDraft() {
     JSON.stringify({
       path: segSelectedPath,
       patientId: segPatientNameInput.value.trim(),
-      detections: segDetections,
+      detections: segAllDetections(),
       time: Date.now(),
     })
   );
@@ -778,7 +794,7 @@ async function offerSegDraftRecovery() {
   segImagePathEl.textContent = "Gambar: " + data.path + " (draf dipulihkan)";
   segSourceBody.innerHTML = `<img src="${segCurrentImageDataUrl}" alt="${data.filename}" />`;
   segPatientNameInput.value = d.patientId || "";
-  segDetections = d.detections;
+  segDetections = splitDeleted(d.detections);
   segCleanJson = null;
   btnRunSegmentation.disabled = false;
   btnSegAddCell.disabled = false;
@@ -935,6 +951,7 @@ async function doRunSegmentation() {
 
   segImgW = data.imageWidth;
   segImgH = data.imageHeight;
+  segDeleted = [];
   segDetections = data.detections.map((d) => ({
     ...d,
     correctedClassIndex: null,
@@ -979,7 +996,7 @@ async function trySaveSegmentation(force) {
     body: JSON.stringify({
       path: segSelectedPath,
       patientId: segPatientNameInput.value.trim(),
-      detections: segDetections,
+      detections: segAllDetections(),
       labelMode: segLabelMode,
       force,
     }),
@@ -1003,7 +1020,7 @@ async function trySaveSegmentation(force) {
     return;
   }
 
-  segCleanJson = JSON.stringify(segDetections);
+  segCleanJson = JSON.stringify(segAllDetections());
   localStorage.removeItem("adt-seg-draft");
   const dupNote = data.isDuplicate ? " (ditandai duplikat)" : "";
   showToast(

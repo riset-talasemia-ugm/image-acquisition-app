@@ -17,7 +17,7 @@ import numpy as np
 from flask import Blueprint, render_template, request
 
 from config import APP_VERSION, LOG_FILENAME, RBC_CLASS_LABELS, SCREENING_MIN_RBC
-from segmentation.storage import _latest_segmentation_rows, _load_model_config
+from segmentation.storage import _latest_segmentation_rows, _load_model_config, active_detections
 from utils import safe_slug
 
 report_bp = Blueprint("report", __name__)
@@ -43,7 +43,7 @@ def patient_report(folder, patient):
     for row in sorted(rows, key=lambda r: r.get("source_image") or ""):
         try:
             with open(os.path.join(folder, row.get("detail_file") or ""), encoding="utf-8") as f:
-                detections = json.load(f).get("detections") or []
+                detections = active_detections(json.load(f).get("detections"))
         except (OSError, ValueError):
             continue
         images.append(row.get("source_image"))

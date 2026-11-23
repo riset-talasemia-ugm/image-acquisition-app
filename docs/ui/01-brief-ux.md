@@ -50,7 +50,7 @@ Dari audit kode:
 - Shortcut tetap: Spasi/Enter di Capture, shortcut koreksi sel di Segmentasi.
 - Ringan di Jetson: tanpa animasi berat dan tanpa efek blur/backdrop.
 - Kontrak backend v0.2.0 tidak berubah. Perombakan hanya menyentuh `templates/` dan `static/`.
-- Layar (dikonfirmasi 2026-11-23): **layar sentuh, bisa juga monitor biasa** dengan mouse/keyboard. Jadi target sentuh minimal 44 px (48 px untuk aksi rutin), tidak ada fungsi yang hanya muncul saat hover, zoom gambar dengan pinch dan tombol, shortcut keyboard hanya sebagai tambahan (bukan satu-satunya cara), dan input ID pasien harus nyaman dengan keyboard layar. Ukuran layarnya belum diketahui (asumsi 1280x800 sampai 1920x1080). **Tanpa scroll halaman**: tata letak mengisi layar, hanya panel yang boleh scroll di dalamnya.
+- Layar (dikonfirmasi 2026-11-23): **layar sentuh, bisa juga monitor biasa** dengan mouse/keyboard. Jadi target sentuh minimal 44 px (48 px untuk aksi rutin), tidak ada fungsi yang hanya muncul saat hover, zoom gambar dengan pinch dan tombol, shortcut keyboard hanya sebagai tambahan (bukan satu-satunya cara), dan input ID pasien harus nyaman dengan keyboard layar. Ukuran layar sentuh **10-12 inci** (dikonfirmasi 2026-11-23; kira-kira 1280x800 sampai 1920x1200), dan bisa ditambah monitor lewat HDMI. **Tanpa scroll halaman**: tata letak mengisi layar, hanya panel yang boleh scroll di dalamnya.
 - Konteks 3T: offline, listrik bisa putus (pekerjaan tidak boleh hilang), dan bantuan teknis jauh. Status perangkat (kamera, model, sisa penyimpanan) harus selalu terlihat.
 - Hasil model adalah **alat bantu, bukan diagnosis**, dan UI harus menyatakannya dengan jelas. Selama model masih mock, statusnya harus terlihat mencolok.
 
@@ -91,6 +91,6 @@ Diambil dari `mockup-ui-redesign/SKENARIO-PENGGUNAAN.md` dan `CATATAN-DESAIN.md`
 ## 6. Pertanyaan terbuka
 
 1. Kondisi ruangan: terang atau diredupkan? Sementara tema terang menjadi default, dengan tema gelap untuk ruang redup.
-2. ~~Sentuh atau tidak?~~ Sentuh dan monitor biasa (dijawab 2026-11-23). Ukuran layar sentuhnya berapa?
+2. ~~Sentuh atau tidak?~~ Sentuh dan monitor biasa (dijawab 2026-11-23). ~~Ukuran layar sentuh?~~ 10-12 inci, plus monitor HDMI opsional.
 3. Fitur apa yang dirasa kurang ("fitur miskin")? Lihat usulan di prototipe.
 4. Arah gaya: **profesional dan tidak generik** (dari pengguna).

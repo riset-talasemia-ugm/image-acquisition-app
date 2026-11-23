@@ -103,6 +103,19 @@ AUTO_STILL_NCC = 0.97
 AUTO_STILL_CHECKS = 2
 AUTO_DUPLICATE_NCC = 0.8
 
+# Penjaga penyimpanan (F11): bar status memberi peringatan kalau sisa ruang di
+# folder simpan di bawah ini. Satu citra 2592x1944 PNG kira-kira 10 MB, jadi
+# 2 GB ~ 200 citra ~ 10 pasien.
+STORAGE_WARN_BYTES = 2 * 1024 ** 3
+
+# Cek jam saat menyala (F5): Jetson tanpa baterai jam bisa kembali ke 1970
+# atau tanggal build. Tahun di bawah ini pasti salah.
+CLOCK_MIN_YEAR = 2026
+
+# Salinan citra yang belum disimpan, supaya bisa dipulihkan setelah listrik
+# padam atau aplikasi tertutup (UC-10). Dihapus setelah citra disimpan.
+RECOVERY_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "recovery")
+
 # Sisa ruang minimum di folder tujuan sebelum menyimpan (byte), di luar
 # perkiraan ukuran file PNG-nya sendiri.
 SAVE_MIN_FREE_BYTES = 50 * 1024 * 1024

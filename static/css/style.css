@@ -183,6 +183,11 @@ kbd {
 .status-item { display: inline-flex; align-items: center; gap: 8px; }
 .status-warn { padding: 0 8px; border-radius: 4px; background: var(--warn-bg); color: var(--warn-ink); font-weight: 700; }
 .status-right { margin-left: auto; }
+
+.check-list { display: grid; grid-template-columns: max-content 1fr; gap: 8px 16px; margin: 0; }
+.check-list dt { color: var(--muted); }
+.check-list dd { margin: 0; font-weight: 700; }
+.check-list .check-warn { color: var(--bad); }
 .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; flex: none; }
 .dot-off { background: var(--muted); }
 .dot-on { background: var(--good); }

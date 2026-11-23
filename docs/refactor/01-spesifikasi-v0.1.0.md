@@ -102,3 +102,7 @@ Hanya penambahan field; field lama tidak berubah.
 
 - `GET /api/camera/status`: field `frozen` (bool), true bila stream dibaca tetapi isi frame tidak berubah lebih dari `CAMERA_FROZEN_SECONDS` (branch `feat/ui-v0.3.0`).
 - `POST /api/save` saat gagal: field `code` (`folder`, `disk_full`, `permission`, `write`, `encode`) dan `message` yang menyebut penyebab. File PNG kini ditulis lewat `cv2.imencode` + `open()`; isinya sama dengan `cv2.imwrite`, tetapi path non-ASCII di Windows ikut berhasil.
+- Rute baru (tercatat di `tests/test_v010.py`, `TestRoutes`):
+  - `GET /api/system/status?folder=`: `bootId`, `time`, `clockSuspect`, `disk` {`path`, `free`, `total`, `low`} (F5, F11);
+  - `GET|POST /api/recovery/capture`: salinan citra belum tersimpan di `recovery/` (UC-10); POST `{action: "restore"|"discard"}`;
+  - `POST /api/segmentation/open-path {path}`: buka gambar sumber tanpa dialog, bentuk respons sama dengan `select-image`.

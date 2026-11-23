@@ -59,6 +59,7 @@
             <span id="folderPath" class="path-text">Belum dipilih</span>
           </span>
           <button id="btnSummary" type="button" class="btn" disabled>Ringkasan folder</button>
+          <span id="patientExisting" class="muted small" aria-live="polite"></span>
           <div id="summaryPanel" class="popover summary-hidden" role="dialog" aria-label="Ringkasan folder tujuan">
             <div class="popover-head">
               <strong>Ringkasan folder tujuan</strong>
@@ -292,9 +293,26 @@
       <footer class="status-bar">
         <span class="status-item"><span id="cameraDot" class="dot dot-off"></span><span id="cameraLabel">Kamera belum terhubung</span></span>
         <span id="statusModel" class="status-item status-warn">Model: memuat status...</span>
+        <span id="statusDisk" class="status-item" title="Sisa ruang di folder simpan (atau folder aplikasi bila belum dipilih)">Penyimpanan: ...</span>
         <span class="status-item status-right">v0.3.0</span>
       </footer>
     </div>
+
+    <dialog id="startupDialog" class="dialog" aria-labelledby="startupTitle">
+      <div class="dialog-head">
+        <h2 id="startupTitle">Cek perangkat</h2>
+      </div>
+      <p class="muted small">Muncul sekali setiap aplikasi dinyalakan. Nama file dan log memakai jam perangkat, jadi pastikan jamnya benar.</p>
+      <dl id="startupList" class="check-list"></dl>
+      <p id="startupClockHelp" class="small view-hidden">
+        Atur jam perangkat dulu, lalu muat ulang halaman ini. Windows: Pengaturan &gt; Waktu &amp; bahasa &gt; Tanggal &amp; waktu.
+        Jetson/Linux: buka terminal, jalankan <code>sudo date -s "2026-11-23 14:05"</code> (ganti dengan jam sekarang).
+      </p>
+      <div class="dialog-actions dialog-actions-end">
+        <button type="button" id="btnClockWrong" class="btn">Jam salah</button>
+        <button type="button" id="btnStartupOk" class="btn btn-primary" autofocus>Semua benar, mulai</button>
+      </div>
+    </dialog>
 
     <dialog id="reportDialog" class="dialog" aria-labelledby="reportTitle">
       <div class="dialog-head">

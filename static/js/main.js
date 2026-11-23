@@ -51,7 +51,12 @@ btnCloseSummary.addEventListener("click", () => {
   summaryPanel.classList.add("summary-hidden");
   summaryDismissed = true;
 });
-patientNameInput.addEventListener("input", updateSaveButtonState);
+patientNameInput.addEventListener("input", () => {
+  updateSaveButtonState();
+  renderPatientExisting();
+  saveSession();
+});
+resolutionSelect.addEventListener("change", saveSession);
 autoToggle.addEventListener("change", () => setAutoMode(autoToggle.checked));
 
 document.getElementById("btnTheme").addEventListener("click", toggleTheme);
@@ -66,7 +71,16 @@ document.querySelectorAll("dialog [data-close]").forEach((btn) =>
 );
 segInspector.addEventListener("click", handleInspectorClick);
 
-loadCameras().then(restoreCameraStatusIfConnected);
+// Urutan saat halaman dibuka: kamera -> sesi tersimpan -> cek perangkat ->
+// tawaran pemulihan (satu dialog pada satu waktu).
+loadCameras().then(async () => {
+  await restoreCameraStatusIfConnected();
+  await restoreSession();
+  await showStartupCheckIfNeeded();
+  await offerCaptureRecovery();
+  await offerSegDraftRecovery();
+});
+setInterval(refreshSystemStatus, 60000);
 loadClassLegend();
 loadSegModelStatus();
 updateSaveButtonState();

@@ -83,5 +83,49 @@ class TestKameraBeku(unittest.TestCase):
         self.assertFalse(cam.is_frozen())
 
 
+
+class TestSesiDanPemulihan(unittest.TestCase):
+    def setUp(self):
+        import capture
+        self.capture = capture
+        self.tmp = tempfile.TemporaryDirectory()
+        self.orig = (capture.RECOVERY_PNG, capture.RECOVERY_META, capture.RECOVERY_DIR)
+        capture.RECOVERY_DIR = self.tmp.name
+        capture.RECOVERY_PNG = os.path.join(self.tmp.name, "capture.png")
+        capture.RECOVERY_META = os.path.join(self.tmp.name, "capture.json")
+        self.client = app.test_client()
+
+    def tearDown(self):
+        self.capture.RECOVERY_PNG, self.capture.RECOVERY_META, self.capture.RECOVERY_DIR = self.orig
+        camera.captured_frame = None
+        self.tmp.cleanup()
+
+    def test_pulihkan_lalu_buang(self):
+        from utils import frame_to_png_base64
+        frame = noisy_frame()
+        self.assertFalse(self.client.get("/api/recovery/capture").get_json()["exists"])
+        self.capture._write_recovery(frame_to_png_base64(frame), {"time": "2026-11-23T10:00:00", "quality": None})
+        self.assertTrue(self.client.get("/api/recovery/capture").get_json()["exists"])
+        res = self.client.post("/api/recovery/capture", json={"action": "restore"}).get_json()
+        self.assertTrue(res["ok"])
+        self.assertTrue(np.array_equal(camera.captured_frame, frame))
+        self.client.post("/api/recovery/capture", json={"action": "discard"})
+        self.assertFalse(self.client.get("/api/recovery/capture").get_json()["exists"])
+
+    def test_open_path(self):
+        folder = os.path.join(self.tmp.name, "pasien-é")
+        os.makedirs(folder)
+        path = os.path.join(folder, "a.png")
+        write_png(path, noisy_frame())
+        res = self.client.post("/api/segmentation/open-path", json={"path": path}).get_json()
+        self.assertEqual((res["width"], res["height"]), (160, 120))
+        self.assertEqual(self.client.post("/api/segmentation/open-path", json={"path": path + "x"}).status_code, 400)
+
+    def test_system_status(self):
+        res = self.client.get("/api/system/status").get_json()
+        self.assertFalse(res["clockSuspect"])
+        self.assertGreater(res["disk"]["free"], 0)
+
+
 if __name__ == "__main__":
     unittest.main()

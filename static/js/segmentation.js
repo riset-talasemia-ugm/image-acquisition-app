@@ -580,6 +580,7 @@ function applyLoadedSegmentationResult(data) {
     correctedClassLabel: d.correctedClassLabel ?? null,
     doctorVerdict: d.doctorVerdict ?? null, // kompatibel dgn file lama sblm fitur ini ada
   }));
+  segCleanJson = JSON.stringify(segDetections);
   segActiveCellId = null;
   updateCellSizeButtonsState();
   segAddMode = false;
@@ -742,8 +743,83 @@ function updateSegTotalCellCount() {
   segTotalCellCount.textContent = `Jumlah sel terdeteksi: ${segDetections.length} sel${verdictText}`;
 }
 
+// -----------------------------------------------------------------------
+// UC-10: draf koreksi yang belum disimpan, di browser. segCleanJson = isi
+// terakhir yang sama dengan file tersimpan (null = hasil belum pernah disimpan).
+// -----------------------------------------------------------------------
+let segCleanJson = null;
+
+function saveSegDraft() {
+  if (!segSelectedPath || segDetections.length === 0 || JSON.stringify(segDetections) === segCleanJson) {
+    localStorage.removeItem("adt-seg-draft");
+    return;
+  }
+  localStorage.setItem(
+    "adt-seg-draft",
+    JSON.stringify({
+      path: segSelectedPath,
+      patientId: segPatientNameInput.value.trim(),
+      detections: segDetections,
+      time: Date.now(),
+    })
+  );
+}
+
+async function offerSegDraftRecovery() {
+  let d;
+  try {
+    d = JSON.parse(localStorage.getItem("adt-seg-draft") || "null");
+  } catch (e) {
+    d = null;
+  }
+  if (!d || !d.path || !(d.detections || []).length) return;
+  const name = d.path.split(/[\\/]/).pop();
+  const when = new Date(d.time).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" });
+  const go = await showChoiceModal(
+    `Ada koreksi segmentasi yang belum disimpan untuk ${name} (${d.detections.length} sel, ${when}). Lanjutkan?`,
+    [
+      { label: "Buang", value: false },
+      { label: "Lanjutkan", value: true, primary: true },
+    ]
+  );
+  if (!go) {
+    localStorage.removeItem("adt-seg-draft");
+    return;
+  }
+  const res = await fetch("/api/segmentation/open-path", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ path: d.path }),
+  });
+  const data = await res.json();
+  if (!data.ok) {
+    if (!data.offline) showError(data.message || "Gambar sumber draf tidak bisa dibuka.");
+    return;
+  }
+  resetSegmentationResults();
+  segSelectedPath = data.path;
+  segActiveFolder = segFolderOf(data.path);
+  segCurrentImageDataUrl = `data:image/png;base64,${data.image}`;
+  segImgW = data.width;
+  segImgH = data.height;
+  segImagePathEl.textContent = "Gambar: " + data.path + " (draf dipulihkan)";
+  segSourceBody.innerHTML = `<img src="${segCurrentImageDataUrl}" alt="${data.filename}" />`;
+  segPatientNameInput.value = d.patientId || "";
+  segDetections = d.detections;
+  segCleanJson = null;
+  btnRunSegmentation.disabled = false;
+  btnSegAddCell.disabled = false;
+  btnSaveSegmentation.disabled = false;
+  renderSegmentationOverlay();
+  renderDetectionsList();
+  updateClassSummaryFromDetections();
+  switchSegImageTab("result");
+  switchTab("segmentation");
+}
+
 function renderDetectionsList() {
   updateSegTotalCellCount();
+  saveSegDraft();
   switchSegListTab();
   renderInspector();
   if (segDetections.length === 0) {
@@ -956,6 +1032,8 @@ async function trySaveSegmentation(force) {
     return;
   }
 
+  segCleanJson = JSON.stringify(segDetections);
+  localStorage.removeItem("adt-seg-draft");
   const dupNote = data.isDuplicate ? " (ditandai duplikat)" : "";
   showToast(
     `Tersimpan (${data.totalCells} sel)${dupNote} -- lihat segmentation_log.csv di folder gambar sumber.`

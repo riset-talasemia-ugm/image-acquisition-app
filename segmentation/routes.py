@@ -8,6 +8,7 @@ import time
 from datetime import datetime
 
 import cv2
+import numpy as np
 from flask import jsonify, request
 
 from config import (
@@ -82,6 +83,27 @@ def api_segmentation_select_image():
         "path": result["path"],
         "filename": os.path.basename(result["path"]),
         "image": b64,
+        "width": width,
+        "height": height,
+    })
+
+
+@segmentation_bp.route("/api/segmentation/open-path", methods=["POST"])
+def api_segmentation_open_path():
+    """Buka gambar sumber dari path yang sudah diketahui (tanpa dialog),
+    dipakai untuk melanjutkan draf koreksi setelah aplikasi tertutup (UC-10)."""
+    path = ((request.json or {}).get("path") or "").strip()
+    if not path or not os.path.isfile(path):
+        return jsonify({"ok": False, "message": f"Gambar sumber tidak ditemukan: {path}"}), 400
+    frame = cv2.imdecode(np.fromfile(path, dtype=np.uint8), cv2.IMREAD_COLOR)
+    if frame is None:
+        return jsonify({"ok": False, "message": "Gagal membaca file gambar."}), 400
+    height, width = frame.shape[:2]
+    return jsonify({
+        "ok": True,
+        "path": path,
+        "filename": os.path.basename(path),
+        "image": frame_to_png_base64(frame),
         "width": width,
         "height": height,
     })

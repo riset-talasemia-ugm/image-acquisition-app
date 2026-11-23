@@ -1,5 +1,6 @@
 """Blueprint capture_bp: kamera, stream, capture, kualitas fokus, pilih folder, simpan, ringkasan folder."""
 
+import base64
 import json
 import os
 import re
@@ -8,6 +9,7 @@ import threading
 from datetime import datetime
 
 import cv2
+import numpy as np
 from flask import Blueprint, Response, jsonify, request
 
 from autocapture import auto_gate
@@ -21,7 +23,10 @@ from config import (
     FOCUS_REL_WARN,
     FOCUS_TILE_COLS,
     FOCUS_TILE_ROWS,
+    CLOCK_MIN_YEAR,
+    RECOVERY_DIR,
     SAVE_MIN_FREE_BYTES,
+    STORAGE_WARN_BYTES,
 )
 from csvlog import log_capture_csv, save_lock
 from quality import analyze_focus_safe, clip_quality, compute_focus_score, focus_tracker, is_blank_frame
@@ -29,6 +34,10 @@ from utils import frame_to_png_base64, safe_slug
 
 # Path route ditulis lengkap di tiap decorator (tanpa url_prefix), sama persis dengan v0.1.0.
 capture_bp = Blueprint("capture", __name__)
+
+# Berubah setiap server dinyalakan; UI memakai ini untuk menampilkan cek
+# perangkat (F5) sekali per nyala.
+BOOT_ID = datetime.now().strftime("%Y%m%d%H%M%S%f")
 
 
 def next_iteration_from_folder(folder, slug):
@@ -130,6 +139,8 @@ def api_capture():
     clip_quality.ensure_started()
     camera.captured_quality = quality
     capture_id = camera.capture_seq
+    _write_recovery(b64, {"time": datetime.now().isoformat(timespec="seconds"),
+                          "quality": quality, "focusScore": focus_score})
 
     return jsonify({
         "ok": True,
@@ -290,6 +301,7 @@ def api_save():
         if problem:
             return jsonify({"ok": False, **problem}), 500
         auto_gate.note_saved(camera.captured_frame)  # gerbang "lapang baru" untuk capture otomatis
+        _clear_recovery()
 
         height, width = frame_to_save.shape[:2]
         quality = camera.captured_quality or {}
@@ -375,6 +387,97 @@ def write_png(path, frame):
         reason = {28: "disk penuh", 13: "izin ditolak", 2: "folder hilang"}.get(e.errno, e.strerror or str(e))
         return {"code": "write", "message": f"Gagal menulis file ({reason}). Cek folder simpan, lalu coba simpan lagi."}
     return None
+
+
+# ---------------------------------------------------------------------------
+# Pemulihan citra yang belum disimpan (UC-10)
+# ---------------------------------------------------------------------------
+RECOVERY_PNG = os.path.join(RECOVERY_DIR, "capture.png")
+RECOVERY_META = os.path.join(RECOVERY_DIR, "capture.json")
+
+
+def _write_recovery(png_b64, meta):
+    """Salin capture terakhir ke disk. Meta ditulis terakhir sebagai tanda
+    salinan lengkap. Gagal menulis tidak boleh menggagalkan capture."""
+    try:
+        os.makedirs(RECOVERY_DIR, exist_ok=True)
+        if os.path.exists(RECOVERY_META):
+            os.remove(RECOVERY_META)
+        with open(RECOVERY_PNG, "wb") as f:
+            f.write(base64.b64decode(png_b64))
+        with open(RECOVERY_META, "w", encoding="utf-8") as f:
+            json.dump(meta, f)
+    except (OSError, TypeError, ValueError) as e:
+        print(f"[DEBUG] Gagal menulis salinan pemulihan: {e}")
+
+
+def _clear_recovery():
+    for path in (RECOVERY_META, RECOVERY_PNG):
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+
+
+@capture_bp.route("/api/recovery/capture", methods=["GET", "POST"])
+def api_recovery_capture():
+    """GET: ada citra belum tersimpan dari sesi sebelumnya? POST {action}:
+    "restore" memasang citra itu sebagai capture aktif (siap disimpan),
+    "discard" membuangnya."""
+    if not os.path.exists(RECOVERY_META):
+        return jsonify({"ok": True, "exists": False})
+    try:
+        with open(RECOVERY_META, encoding="utf-8") as f:
+            meta = json.load(f)
+        frame = cv2.imdecode(np.fromfile(RECOVERY_PNG, dtype=np.uint8), cv2.IMREAD_COLOR)
+    except (OSError, ValueError):
+        frame, meta = None, {}
+    if frame is None:
+        _clear_recovery()
+        return jsonify({"ok": True, "exists": False})
+
+    if request.method == "GET":
+        return jsonify({"ok": True, "exists": True, "time": meta.get("time")})
+
+    action = (request.json or {}).get("action")
+    if action == "discard":
+        _clear_recovery()
+        return jsonify({"ok": True})
+    if action != "restore":
+        return jsonify({"ok": False, "message": "Aksi tidak dikenal."}), 400
+    with camera.lock:
+        camera.captured_frame = frame
+        camera.capture_seq += 1
+        camera.captured_focus_score = meta.get("focusScore") or compute_focus_score(frame)
+        camera.captured_quality = meta.get("quality")
+        camera.captured_semantic = None
+    return jsonify({
+        "ok": True,
+        "time": meta.get("time"),
+        "image": frame_to_png_base64(frame),
+        "quality": meta.get("quality"),
+    })
+
+
+@capture_bp.route("/api/system/status")
+def api_system_status():
+    """Jam perangkat dan sisa ruang di folder simpan (F5, F11). Tanpa folder
+    yang valid, ruang dihitung di folder aplikasi."""
+    folder = (request.args.get("folder") or "").strip()
+    path = folder if folder and os.path.isdir(folder) else os.path.dirname(os.path.abspath(__file__))
+    try:
+        usage = shutil.disk_usage(path)
+        disk = {"path": path, "free": usage.free, "total": usage.total, "low": usage.free < STORAGE_WARN_BYTES}
+    except OSError:
+        disk = None
+    now = datetime.now()
+    return jsonify({
+        "ok": True,
+        "bootId": BOOT_ID,
+        "time": now.isoformat(timespec="seconds"),
+        "clockSuspect": now.year < CLOCK_MIN_YEAR,
+        "disk": disk,
+    })
 
 
 @capture_bp.route("/api/folder-summary")

@@ -86,6 +86,8 @@ COCO seperti v0.1.0, dengan opsi hanya sel yang sudah direview.
 ### UC-10 Pulih setelah listrik padam (baru)
 Sesi aktif (ID pasien, folder, citra terakhir yang belum disimpan, koreksi yang belum disimpan) dicatat ke disk secara berkala. Saat aplikasi dibuka lagi, pengguna ditawari untuk melanjutkan.
 
+Status (2026-11-23, `feat/ui-v0.3.0`): sudah dibuat. Pengaturan sesi dan draf koreksi disimpan di browser (localStorage), citra belum tersimpan disalin server ke `recovery/`. Urutan saat dibuka: sesi dipulihkan, cek perangkat (F5), tawaran memulihkan citra, tawaran melanjutkan draf koreksi. Catatan: localStorage terikat ke browser; kalau browser diganti atau datanya dihapus, hanya salinan citra di server yang tersisa.
+
 ### UC-11 Belajar morfologi sel (usulan)
 Contoh tiap kelas sel dari data yang sudah direview dokter, dengan penjelasan singkat. Perlu persetujuan penggunaan data.
 
@@ -124,7 +126,7 @@ Penilaian dokter tersedia (dikonfirmasi 2026-11-23). Lembar penilaian dibuat di 
 Aturan untuk semua tingkat:
 - **Target per pasien: minimal 1.000 eritrosit** (dikonfirmasi pengguna 2026-11-23). Jumlah citra mengikuti, biasanya sekitar 15-20 citra dengan kepadatan normal.
 - **Jumlah resmi dihitung sesudah review dokter** (dikonfirmasi 2026-11-23), yaitu dari kelas akhir setelah koreksi, tambah, dan hapus sel.
-- Selama akuisisi belum ada review, jadi progres "x dari 1.000" memakai **perkiraan** dari hasil model dan diberi label perkiraan. Capture otomatis dan pemindaian berhenti saat perkiraan mencapai target, ditambah cadangan kecil (mis. 10%) supaya jumlahnya tetap cukup kalau dokter menghapus sel. Besar cadangannya diputuskan setelah ada data review.
+- Selama akuisisi belum ada review, jadi progres "x dari 1.000" memakai **perkiraan** dari hasil model dan diberi label perkiraan. Capture otomatis dan pemindaian berhenti saat perkiraan mencapai target, ditambah cadangan **10%** (dikonfirmasi 2026-11-23, jadi berhenti di perkiraan 1.100 sel) supaya jumlahnya tetap cukup kalau dokter menghapus sel. Bisa direvisi setelah ada data review.
 - Pada pemindaian bermotor dengan overlap antar lapang, sel di area overlap harus **dihitung satu kali**. Caranya: hanya sel yang titik pusatnya berada di area inti lapang (di luar pita overlap) yang dihitung, atau sel dicocokkan antar lapang memakai posisi meja.
 - Tiap citra otomatis tetap lewat gerbang kualitas yang sama dengan capture manual, dan alasan citra ditolak dicatat (mis. buram, duplikat, terlalu padat).
 - Capture manual tetap tersedia.

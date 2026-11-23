@@ -223,6 +223,7 @@ preproc_compare_out/
 
 # File sementara (log, skrip uji, keluaran)
 /tmp/
+/recovery/
 
 # catatan kerja lokal (tidak di-push)
 CLAUDE.md

@@ -157,7 +157,16 @@ class TestRoutes(Base):
             for r in flask_app.url_map.iter_rules()
             if r.endpoint != "static"
         )
-        self.snap("routes", rules)
+        # Rute v0.1.0 tidak boleh hilang atau berubah method. Rute yang ditambahkan
+        # sesudahnya harus tercatat di sini (dan di docs/refactor/01, bagian
+        # "Perubahan kontrak sesudah v0.1.0"), supaya tidak bertambah diam-diam.
+        added = {
+            "/api/recovery/capture GET,POST",
+            "/api/segmentation/open-path POST",
+            "/api/system/status GET",
+        }
+        self.assertEqual(added - set(rules), set(), "rute tambahan tercatat tapi tidak ada")
+        self.snap("routes", [r for r in rules if r not in added])
 
 
 class TestHelpers(Base):

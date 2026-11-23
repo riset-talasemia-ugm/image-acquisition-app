@@ -25,6 +25,11 @@ Target rilis 0.2.0: refactor backend tanpa mengubah perilaku (lihat `docs/refact
 - Capture otomatis tingkat 1 (UC-13): setelan di toolbar Akuisisi (default mati). Aplikasi memotret dan menyimpan sendiri saat frame lolos gerbang berurutan: ada sel, meja diam, lapang baru (bukan duplikat citra tersimpan terakhir), fokus di puncak dan baik. Daftar gerbang tampil di atas stream; citra otomatis ditandai "O" di riwayat. CLIP mode bayangan (dicatat, tidak memblokir). Ambang di `config.py` (`AUTO_*`), masih heuristik.
 - Kolom `capture_mode` di `capture_log.csv` (`manual` / `otomatis-1`), dengan migrasi otomatis log lama. Daftar kolom di `tests/test_v010.py` ikut ditambah (perubahan format yang disengaja, bukan perekaman ulang snapshot).
 - Tes `tests/test_autocapture.py` (7 tes).
+- Cek perangkat saat menyala (F5): dialog sekali per nyala server berisi jam (ditandai bila tahunnya mustahil), jumlah kamera, dan sisa penyimpanan, dengan petunjuk mengatur jam.
+- Penjaga penyimpanan (F11): sisa ruang folder simpan di bar status, peringatan di bawah 2 GB.
+- Sesi pasien (UC-01): inisial, folder, resolusi, dan kamera diingat dan dipulihkan saat halaman dibuka lagi; bar sesi menyebut jumlah citra pasien itu yang sudah ada di folder.
+- Pemulihan (UC-10): citra yang belum disimpan disalin ke `recovery/` dan ditawarkan untuk dipulihkan setelah aplikasi tertutup; draf koreksi segmentasi yang belum disimpan juga ditawarkan untuk dilanjutkan.
+- Rute baru `/api/system/status`, `/api/recovery/capture`, `/api/segmentation/open-path`. Tes rute kini menerima rute tambahan yang tercatat eksplisit; rute v0.1.0 tetap dibandingkan dengan snapshot.
 - `static/js/app.js` dipecah apa adanya menjadi `common.js`, `capture.js`, `segmentation.js`, `main.js`. Backend tidak berubah.
 
 ### Added

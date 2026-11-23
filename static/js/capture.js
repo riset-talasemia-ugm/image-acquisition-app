@@ -125,6 +125,7 @@ async function connectCamera() {
       : "index " + data.index;
     applyConnectedUI(selectedName, data.width, data.height);
     hideError("camera");
+    saveSession();
   } else {
     cameraDot.className = "dot dot-off";
     cameraLabel.textContent = "Gagal menghubungkan kamera";
@@ -435,6 +436,52 @@ function setAutoMode(on) {
   }
 }
 
+// -----------------------------------------------------------------------
+// Cek perangkat saat menyala (F5) dan penjaga penyimpanan (F11)
+// -----------------------------------------------------------------------
+const statusDisk = document.getElementById("statusDisk");
+
+function formatBytes(n) {
+  return n >= 1024 ** 3 ? (n / 1024 ** 3).toFixed(1) + " GB" : Math.round(n / 1024 ** 2) + " MB";
+}
+
+async function refreshSystemStatus() {
+  const res = await fetch("/api/system/status?folder=" + encodeURIComponent(selectedFolder || ""));
+  const data = await res.json();
+  if (!data.ok) return null;
+  if (data.disk) {
+    statusDisk.textContent = `Penyimpanan: ${formatBytes(data.disk.free)} tersisa` + (data.disk.low ? ", hampir penuh" : "");
+    statusDisk.classList.toggle("status-warn", data.disk.low);
+  }
+  return data;
+}
+
+async function showStartupCheckIfNeeded() {
+  const data = await refreshSystemStatus();
+  if (!data || localStorage.getItem("adt-boot-checked") === data.bootId) return;
+  const when = new Date(data.time).toLocaleString("id-ID", { dateStyle: "full", timeStyle: "short" });
+  const cams = [...cameraSelect.options].filter((o) => o.value !== "").length;
+  const rows = [
+    ["Jam perangkat", when + (data.clockSuspect ? " (kemungkinan salah)" : ""), data.clockSuspect],
+    ["Kamera", cams ? `${cams} terdeteksi` : "Tidak ada kamera terdeteksi. Cek kabel USB.", !cams],
+    ["Penyimpanan", data.disk ? `${formatBytes(data.disk.free)} tersisa` + (data.disk.low ? ", hampir penuh" : "") : "Tidak terbaca", !data.disk || data.disk.low],
+  ];
+  document.getElementById("startupList").innerHTML = rows
+    .map(([k, v, warn]) => `<dt>${k}</dt><dd class="${warn ? "check-warn" : ""}">${v}</dd>`)
+    .join("");
+  document.getElementById("startupClockHelp").classList.toggle("view-hidden", !data.clockSuspect);
+  const dlg = document.getElementById("startupDialog");
+  document.getElementById("btnStartupOk").onclick = () => {
+    localStorage.setItem("adt-boot-checked", data.bootId);
+    dlg.close();
+  };
+  const closed = new Promise((resolve) => dlg.addEventListener("close", resolve, { once: true }));
+  document.getElementById("btnClockWrong").onclick = () =>
+    document.getElementById("startupClockHelp").classList.remove("view-hidden");
+  dlg.showModal();
+  await closed; // pemulihan sesi ditawarkan sesudah cek perangkat selesai
+}
+
 async function resetFocusPeak() {
   try {
     await fetch("/api/focus/reset-peak", { method: "POST" });
@@ -606,7 +653,9 @@ async function doSelectFolder() {
   folderPathEl.title = selectedFolder;
   btnSummary.disabled = false;
   updateSaveButtonState();
+  saveSession();
   loadFolderSummary();
+  refreshSystemStatus();
 }
 
 // Riwayat sesi: tiap item menyimpan gambar hasil capture (resolusi asli kamera,
@@ -720,11 +769,116 @@ window.addEventListener("keydown", (e) => {
 
 let summaryDismissed = false; // true kalau user sengaja nutup panel ringkasan
 
+let folderSummaryCache = []; // [{id, count}] dari ringkasan folder terakhir
+
+// Sama dengan utils.safe_slug di server: nama file memakai bentuk ini.
+function slugOf(name) {
+  return name.trim().toLowerCase().replace(/ /g, "-").replace(/[^a-z0-9-]/g, "") || "pasien";
+}
+
+// UC-01: kalau pasien ini sudah punya citra di folder, sebutkan supaya
+// operator tahu sesi ini melanjutkan, bukan pasien baru.
+function renderPatientExisting() {
+  const el = document.getElementById("patientExisting");
+  const name = patientNameInput.value.trim();
+  if (!name || !selectedFolder) {
+    el.textContent = "";
+    return;
+  }
+  const entry = folderSummaryCache.find((s) => s.id === slugOf(name));
+  el.textContent = entry
+    ? `Melanjutkan: sudah ada ${entry.count} citra untuk ${entry.id} di folder ini.`
+    : "Pasien baru di folder ini.";
+}
+
+// UC-01/K-C6: pengaturan sesi diingat di browser dan dipulihkan saat halaman
+// dibuka lagi (mis. setelah listrik padam).
+function saveSession() {
+  localStorage.setItem(
+    "adt-session",
+    JSON.stringify({
+      patient: patientNameInput.value.trim(),
+      folder: selectedFolder,
+      resolution: resolutionSelect.value,
+      camera: cameraSelect.value,
+    })
+  );
+}
+
+async function restoreSession() {
+  let s;
+  try {
+    s = JSON.parse(localStorage.getItem("adt-session") || "null");
+  } catch (e) {
+    s = null;
+  }
+  if (!s) return;
+  patientNameInput.value = s.patient || "";
+  if (s.resolution !== undefined) resolutionSelect.value = s.resolution;
+  if (s.camera && !isCameraConnected && [...cameraSelect.options].some((o) => o.value === s.camera)) {
+    cameraSelect.value = s.camera;
+  }
+  if (s.folder) {
+    selectedFolder = s.folder;
+    folderPathEl.textContent = s.folder;
+    folderPathEl.title = s.folder;
+    btnSummary.disabled = false;
+    await loadFolderSummary({ forceShow: false, show: false });
+    if (!selectedFolder) showToast("Folder simpan sesi sebelumnya tidak ditemukan lagi. Pilih lokasi simpan.");
+  }
+  updateSaveButtonState();
+  renderPatientExisting();
+}
+
+// UC-10: citra yang belum disimpan saat aplikasi tertutup disalin server ke
+// disk; tawarkan untuk memulihkannya.
+async function offerCaptureRecovery() {
+  const data = await (await fetch("/api/recovery/capture")).json();
+  if (!data.exists || hasCapturedImage) return;
+  const when = data.time ? new Date(data.time).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" }) : "";
+  const action = await showChoiceModal(
+    `Ada citra yang belum disimpan dari sesi sebelumnya (diambil ${when}). Pulihkan supaya bisa disimpan?`,
+    [
+      { label: "Buang", value: "discard" },
+      { label: "Pulihkan", value: "restore", primary: true },
+    ]
+  );
+  const res = await fetch("/api/recovery/capture", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action }),
+  });
+  const r = await res.json();
+  if (action !== "restore" || !r.ok) return;
+  captureBody.innerHTML = `<img src="data:image/png;base64,${r.image}" alt="citra dipulihkan" />`;
+  captureBadge.textContent = "Belum Tersimpan";
+  captureBadge.className = "badge badge-unsaved";
+  captureFilename.textContent = "Dipulihkan dari sesi sebelumnya" + (when ? ` (${when})` : "");
+  hasCapturedImage = true;
+  lastCapturedImage = r.image;
+  currentCaptureSaved = false;
+  currentCaptureSavedAs = null;
+  currentCaptureFocus = r.quality && r.quality.valid ? { status: r.quality.status, relLow: r.quality.relLow } : null;
+  updateSaveButtonState();
+  switchTab("capture");
+}
+
 async function loadFolderSummary(options = {}) {
   const forceShow = options.forceShow !== false; // default true
   if (!selectedFolder) return;
   const res = await fetch("/api/folder-summary?folder=" + encodeURIComponent(selectedFolder));
   const data = await res.json();
+  folderSummaryCache = data.ok ? data.summary : [];
+  if (!data.ok && !data.offline && options.forceShow === false) {
+    // Folder sesi lama sudah tidak ada: lupakan, jangan tampilkan panel.
+    selectedFolder = null;
+    folderPathEl.textContent = "Belum dipilih";
+    btnSummary.disabled = true;
+    saveSession();
+    renderPatientExisting();
+    return;
+  }
+  renderPatientExisting();
   if (!data.ok) {
     summaryBody.innerHTML = `<div class="summary-row">${data.message || "Gagal memuat ringkasan."}</div>`;
   } else if (data.summary.length === 0) {
@@ -738,7 +892,7 @@ async function loadFolderSummary(options = {}) {
       `<div class="summary-total">Total: ${data.totalPatients} pasien, ${data.totalFiles} gambar</div>`;
   }
   if (forceShow) summaryDismissed = false;
-  if (!summaryDismissed) summaryPanel.classList.remove("summary-hidden");
+  if (!summaryDismissed && options.show !== false) summaryPanel.classList.remove("summary-hidden");
 }
 
 function updateSaveButtonState() {
@@ -844,6 +998,7 @@ async function doSave(mode) {
   if (lastCapturedImage) addToGallery(data.filename, lastCapturedImage);
   document.getElementById("sessionCount").textContent = galleryEntries.length;
   loadFolderSummary({ forceShow: false });
+  refreshSystemStatus();
 }
 
 

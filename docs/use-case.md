@@ -75,7 +75,7 @@ Yang perlu diputuskan nanti: media kirim, enkripsi paket, dan siapa yang berwena
 4. **Aplikasi tidak menghasilkan diagnosis sendiri.** Kalau nanti ada indikasi otomatis (mis. ambang persentase sel target/mikrosit), kriterianya wajib berasal dari tim klinis, dicatat beserta sumbernya, dan ditampilkan sebagai saran.
 
 ### UC-07 Laporan pasien (baru)
-Lihat bagian 5 untuk isi dan format.
+Lihat bagian 5 untuk isi dan format. Status (2026-11-23, `feat/ui-v0.3.0`): halaman cetak `/laporan` (`report.py`, `templates/laporan.html`) dengan isi butir 1-8. Nama unit, operator, dokter, dan kesimpulan diisi di halaman dan diingat browser. Format resmi dari unit kesehatan belum ada, jadi ini format usulan.
 
 ### UC-08 Statistik dan laporan Excel
 Export Excel yang ada (Ringkasan Pasien, Detail per Gambar, Detail per Sel) diperluas dengan statistik lintas pasien dan rentang tanggal.

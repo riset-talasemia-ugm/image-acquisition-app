@@ -121,6 +121,13 @@ RECOVERY_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "recover
 SAVE_MIN_FREE_BYTES = 50 * 1024 * 1024
 LOG_FILENAME = "capture_log.csv"
 
+# Versi yang dicetak di laporan pasien. Naikkan bersama tag rilis.
+APP_VERSION = "0.3.0-dev"
+
+# Skrining: minimal eritrosit per pasien, dihitung sesudah review dokter dan
+# tanpa Uncategorised (keputusan 2026-11-23, docs/use-case.md).
+SCREENING_MIN_RBC = 1000
+
 # Label kelas morfologi sel eritrosit untuk tab Segmentasi & Klasifikasi.
 # Urutan index di sini PENTING -- ini bakal jadi mapping output model
 # klasifikasi (deep learning) begitu pipeline-nya dipasang, jadi jangan

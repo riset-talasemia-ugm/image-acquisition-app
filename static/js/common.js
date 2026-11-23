@@ -109,6 +109,11 @@ function showChoiceModal(message, choices) {
         e.preventDefault();
         e.stopImmediatePropagation();
         cleanup(choices[0].value);
+      } else if (e.key === "Enter" && !confirmModalActions.contains(document.activeElement)) {
+        // Fokus lepas dari tombol (mis. klik di luar kotak): Enter tetap memilih pilihan utama.
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        cleanup((choices.find((c) => c.primary) || choices[choices.length - 1]).value);
       }
     }
     window.addEventListener("keydown", onKey, true);

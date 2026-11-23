@@ -23,7 +23,7 @@ Target rilis 0.2.0: refactor backend tanpa mengubah perilaku (lihat `docs/refact
 
 ### Fixed (target 0.3.0)
 - Menyimpan review dokter yang hanya menambah verdict (tanpa mengubah kelas) dianggap "duplikat" dan bisa batal tersimpan bila pengguna menekan Batal. Cek duplikat kini membandingkan isi deteksi lengkap dengan file tersimpan terakhir (ada sejak v0.1.0).
-- Spasi saat modal konfirmasi terbuka menekan tombol yang disorot (mis. "tetap simpan" citra buram). Kini Spasi diabaikan di modal, Enter memilih, Esc membatalkan.
+- Spasi saat modal konfirmasi terbuka menekan tombol yang disorot (mis. "tetap simpan" citra buram). Kini Spasi diabaikan di modal, Enter memilih (juga setelah klik di luar kotak), Esc membatalkan.
 - "Kirim ke analisis" tetap aktif setelah capture baru yang belum disimpan dan mengirim citra lama. Kini dimatikan sampai citra baru disimpan.
 - Grafik jumlah per kelas tidak terbaca di panel sempit (SVG 820 px diperkecil). Diganti batang horizontal dengan label dan angka biasa.
 
@@ -37,6 +37,7 @@ Target rilis 0.2.0: refactor backend tanpa mengubah perilaku (lihat `docs/refact
 - Pemulihan (UC-10): citra yang belum disimpan disalin ke `recovery/` dan ditawarkan untuk dipulihkan setelah aplikasi tertutup; draf koreksi segmentasi yang belum disimpan juga ditawarkan untuk dilanjutkan.
 - Lembar penilaian citra oleh dokter (F14): layar 2 "Penilaian citra" (urutan kerja kini Akuisisi, Penilaian citra, Analisis sel). Citra tampil penuh dengan ID acak, tanpa nama file dan skor; Layak/Tidak layak (L/T), alasan wajib bila tidak layak (1-6), catatan opsional, Sebelumnya. Hasil di `penilaian_citra.csv`, peta ID di `penilaian_citra_id.json` (folder citra). Modul `rating.py`.
 - "Proses satu folder" melewati citra yang dinilai tidak layak oleh salah satu penilai; konfirmasi menyebut jumlah tidak layak dan yang belum dinilai.
+- Laporan pasien siap cetak/PDF (UC-07): tombol di dialog Laporan dan export membuka halaman A4 (`/laporan`, `report.py`) berisi pasien dan pemeriksaan, kualitas data, hasil morfologi sesudah review (eritrosit tanpa Uncategorised, tanda bila kurang dari 1.000), contoh citra, kesimpulan dokter (diisi di halaman), pernyataan alat bantu, dan tanda tangan. Peringatan mencolok selama model masih mock. Tanpa nama file/path. PDF lewat Cetak > Simpan sebagai PDF.
 - Peta fokus di atas stream (Tampilan > Peta fokus), semi-transparan, mengikuti posisi gambar.
 - Inspektur sel menampilkan potongan sel terpilih yang diperbesar dengan garis tepi berwarna kelas.
 - Rute baru `/api/system/status`, `/api/recovery/capture`, `/api/segmentation/open-path`. Tes rute kini menerima rute tambahan yang tercatat eksplisit; rute v0.1.0 tetap dibandingkan dengan snapshot.

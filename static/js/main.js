@@ -93,6 +93,14 @@ document.querySelectorAll("dialog [data-close]").forEach((btn) =>
   btn.addEventListener("click", () => btn.closest("dialog").close())
 );
 segInspector.addEventListener("click", handleInspectorClick);
+document.getElementById("btnPatientReport").addEventListener("click", () => {
+  const patient = segPatientNameInput.value.trim();
+  if (!segActiveFolder || !patient) {
+    showToast("Isi inisial pasien dan buka satu hasil (atau proses satu folder) dulu.");
+    return;
+  }
+  window.open(`/laporan?folder=${encodeURIComponent(segActiveFolder)}&patient=${encodeURIComponent(patient)}`, "_blank");
+});
 
 // Urutan saat halaman dibuka: kamera -> sesi tersimpan -> cek perangkat ->
 // tawaran pemulihan (satu dialog pada satu waktu).

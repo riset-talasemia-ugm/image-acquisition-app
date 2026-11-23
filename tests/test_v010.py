@@ -166,6 +166,7 @@ class TestRoutes(Base):
             "/api/recovery/capture GET,POST",
             "/api/segmentation/open-path POST",
             "/api/system/status GET",
+            "/laporan GET",
         }
         self.assertEqual(added - set(rules), set(), "rute tambahan tercatat tapi tidak ada")
         self.snap("routes", [r for r in rules if r not in added])

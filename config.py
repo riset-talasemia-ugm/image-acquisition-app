@@ -94,6 +94,15 @@ OPENCV_DISCONNECT_THRESHOLD = 15
 # hampir seragam (lensa tertutup, gelap total) dikecualikan.
 CAMERA_FROZEN_SECONDS = 5.0
 
+# Capture otomatis tingkat 1 (autocapture.py). MASIH HEURISTIK: dikalibrasi di
+# mikroskop asli (nilai NCC citra kasar 64x48 antar pemeriksaan ~0,7 detik).
+# - Meja dianggap diam kalau NCC frame berturut-turut >= AUTO_STILL_NCC selama
+#   AUTO_STILL_CHECKS pemeriksaan (memutar fokus halus tetap dihitung diam).
+# - Lapang dianggap sama dengan citra tersimpan terakhir kalau NCC >= AUTO_DUPLICATE_NCC.
+AUTO_STILL_NCC = 0.97
+AUTO_STILL_CHECKS = 2
+AUTO_DUPLICATE_NCC = 0.8
+
 # Sisa ruang minimum di folder tujuan sebelum menyimpan (byte), di luar
 # perkiraan ukuran file PNG-nya sendiri.
 SAVE_MIN_FREE_BYTES = 50 * 1024 * 1024

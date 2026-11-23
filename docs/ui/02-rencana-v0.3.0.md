@@ -4,14 +4,14 @@ Status: dikerjakan di branch `feat/ui-v0.3.0` (dibuat dari `refactor/v0.2.0`, 20
 
 ## 1. Cakupan
 
-- **Hanya frontend**: `templates/`, `static/`. Kontrak backend v0.2.0 tidak berubah (29 route, bentuk JSON sama).
+- Awalnya hanya frontend. Atas permintaan pengguna (2026-11-23) ditambah perbaikan galat dan capture otomatis tingkat 1, yang menyentuh backend; perubahan kontraknya hanya penambahan field (lihat `docs/refactor/01-spesifikasi-v0.1.0.md`, bagian "Perubahan kontrak sesudah v0.1.0").
 - Acuan: prototipe Artifact (sumber `tmp/ui-prototipe/`) dan `01-brief-ux.md`.
 - Dua layar dari prototipe yang fiturnya sudah ada: **Akuisisi** (model manual) dan **Analisis sel**. Pindah layar lewat navigasi tahap di header (tanpa reload, state tetap).
 - Semua fitur v0.1.0 tetap ada (inventaris di bagian 3).
 
 Tidak dikerjakan di v0.3.0 karena butuh backend baru (urutan menyusul, lihat `docs/use-case.md`):
 - layar Sesi pasien, Laporan pasien, Penilaian citra, Akuisisi otomatis (Pindai);
-- capture otomatis (UC-13), beberapa citra belum tersimpan sekaligus (K-A3), sisa penyimpanan, perkiraan jumlah eritrosit per pasien;
+- capture otomatis tingkat 2-3 (bermotor); beberapa citra belum tersimpan sekaligus (K-A3; sebagai gantinya Ambil citra bertanya dulu bila ada citra belum tersimpan), sisa penyimpanan, perkiraan jumlah eritrosit per pasien;
 - mode label "Ukuran, bentuk, warna" (butuh field `attributes`, lihat `use-case.md` bagian 7);
 - login/nama pengguna di header.
 

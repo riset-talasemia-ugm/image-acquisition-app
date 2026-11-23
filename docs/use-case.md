@@ -130,6 +130,12 @@ Aturan untuk semua tingkat:
 - Capture manual tetap tersedia.
 - Log mencatat apakah citra diambil otomatis atau manual, dan dengan tingkat berapa.
 
+**Status tingkat 1 (2026-11-23, branch `feat/ui-v0.3.0`):** sudah dibuat sebagai setelan "Capture otomatis" (default mati) di toolbar layar Akuisisi.
+- Gerbang di `autocapture.py`, dinilai pada poll `/api/focus/live?auto=1`: tidak kosong, meja diam (NCC citra kasar antar poll >= `AUTO_STILL_NCC` selama `AUTO_STILL_CHECKS` poll), lapang baru (NCC dengan citra tersimpan terakhir < `AUTO_DUPLICATE_NCC`), fokus terkonfirmasi dan "baik". Ambang di `config.py`, masih heuristik dan harus dikalibrasi di mikroskop asli.
+- CLIP mode bayangan: skor dicatat saat simpan seperti capture manual, tidak memblokir.
+- Log: kolom baru `capture_mode` di `capture_log.csv` (`manual` / `otomatis-1`), log lama dimigrasi otomatis.
+- Belum: penghitung alasan penolakan per lapang, progres "x dari 1.000" (butuh perkiraan jumlah sel dari model asli), berhenti otomatis saat target tercapai.
+
 **Rancangan yang sudah ada:** `akuisisi-otomatis/rancangan.md` berisi rancangan rinci tingkat 3:
 - motor stepper yang dikendalikan langsung lewat GPIO Jetson, untuk sumbu Z dan meja XY berpola snake;
 - state machine akuisisi, strategi autofokus, gerbang kualitas (kosong, Tenengrad, CLIP), dan enam tahapan pengerjaan.

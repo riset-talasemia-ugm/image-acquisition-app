@@ -46,6 +46,8 @@ CAPTURE_LOG_FIELDS = [
     "tile_median", "tile_low", "tile_center", "tile_edge", "tile_valid_frac", "edge_ratio",
     "edge_warn", "rel_low", "rel_median", "focus_status", "tile_map_json",
     "clip_kepadatan", "clip_gabungan_v2", "clip_norm", "clip_model",
+    # Ditambahkan sesudah v0.1.0 (capture otomatis, UC-13); log lama dimigrasi otomatis.
+    "capture_mode",
 ]
 
 _TS = [

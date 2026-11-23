@@ -90,11 +90,24 @@
                 <button id="btnCameraSettings" type="button" class="btn" disabled title="Dialog bawaan driver kamera (exposure, white balance, dll.)">Pengaturan driver</button>
                 {% endif %}
               </div>
+              <div class="group">
+                <span class="group-label">Mode</span>
+                <label class="switch-label" title="Memotret dan menyimpan sendiri saat lapang lolos semua pemeriksaan. Anda tetap menggeser meja dan memutar fokus.">
+                  <input type="checkbox" id="autoToggle" /> Capture otomatis
+                </label>
+              </div>
             </div>
+            <div class="specimen-wrap">
             <div class="specimen" id="streamBody">
               <span class="placeholder-text">Kamera belum terhubung.<br />Pilih kamera di atas, lalu tekan Hubungkan.</span>
             </div>
             <div id="streamChip" class="stream-chip view-hidden" aria-live="polite"></div>
+            <div id="autoPanel" class="auto-panel view-hidden" aria-live="polite">
+              <div id="autoTitle" class="auto-title"></div>
+              <ol id="autoGates" class="gates"></ol>
+              <div class="muted small">Tersimpan otomatis: <strong id="autoAccepted">0</strong>. Skor CLIP hanya dicatat, belum memblokir.</div>
+            </div>
+            </div>
           </section>
 
           <aside class="side" aria-label="Kontrol capture">

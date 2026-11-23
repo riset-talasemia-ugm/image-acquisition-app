@@ -58,6 +58,7 @@ def log_capture_csv(folder, row):
         "edge_ratio", "edge_warn",
         "rel_low", "rel_median", "focus_status", "tile_map_json",
         "clip_kepadatan", "clip_gabungan_v2", "clip_norm", "clip_model",
+        "capture_mode",  # "manual" atau "otomatis-1" (capture otomatis tingkat 1)
     ]
     if not is_new:
         # Migrasi in-place kalau capture_log.csv dari versi lama belum punya

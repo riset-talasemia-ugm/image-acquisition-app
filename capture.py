@@ -10,6 +10,7 @@ from datetime import datetime
 import cv2
 from flask import Blueprint, Response, jsonify, request
 
+from autocapture import auto_gate
 from camera import camera, gen_mjpeg
 from config import (
     CLIP_MODEL_NAME,
@@ -177,7 +178,12 @@ def api_focus_live():
     quality = analyze_focus_safe(frame)
     # Variance Laplacian (metode lama) ikut ditampilkan sebagai pembanding live.
     quality["laplacian"] = round(compute_focus_score(frame), 1)
-    return jsonify({"ok": True, "quality": quality, "clipState": clip_quality.state})
+    result = {"ok": True, "quality": quality, "clipState": clip_quality.state}
+    # Capture otomatis menilai gerbangnya di frame yang sama, supaya frame tidak
+    # dianalisis dua kali (lihat autocapture.py).
+    if request.args.get("auto") == "1":
+        result["auto"] = auto_gate.evaluate(frame, quality)
+    return jsonify(result)
 
 
 @capture_bp.route("/api/focus/reset-peak", methods=["POST"])
@@ -237,6 +243,7 @@ def api_save():
     camera_name = (data.get("cameraName") or "").strip()
     target_width = data.get("width")
     target_height = data.get("height")
+    capture_mode = "otomatis-1" if data.get("mode") == "otomatis" else "manual"
 
     if not patient_name:
         return jsonify({"ok": False, "message": "Nama pasien belum diisi."}), 400
@@ -282,6 +289,7 @@ def api_save():
         problem = write_png(full_path, frame_to_save)
         if problem:
             return jsonify({"ok": False, **problem}), 500
+        auto_gate.note_saved(camera.captured_frame)  # gerbang "lapang baru" untuk capture otomatis
 
         height, width = frame_to_save.shape[:2]
         quality = camera.captured_quality or {}
@@ -314,6 +322,7 @@ def api_save():
             "clip_gabungan_v2": _fmt(semantic.get("gabungan_v2"), 4),
             "clip_norm": _fmt(semantic.get("norm"), 3),
             "clip_model": semantic.get("model") or "",
+            "capture_mode": capture_mode,
         })
 
     return jsonify(

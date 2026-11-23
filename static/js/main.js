@@ -52,6 +52,7 @@ btnCloseSummary.addEventListener("click", () => {
   summaryDismissed = true;
 });
 patientNameInput.addEventListener("input", updateSaveButtonState);
+autoToggle.addEventListener("change", () => setAutoMode(autoToggle.checked));
 
 document.getElementById("btnTheme").addEventListener("click", toggleTheme);
 document.getElementById("btnOpenSettings").addEventListener("click", () =>

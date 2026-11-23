@@ -20,6 +20,11 @@ Target rilis 0.2.0: refactor backend tanpa mengubah perilaku (lihat `docs/refact
 - `/api/save` menyebut penyebab gagal (folder hilang, disk penuh, izin, gagal tulis) dalam field `code` dan `message`, dan menulis PNG lewat `cv2.imencode` sehingga path non-ASCII di Windows tidak gagal diam-diam.
 - `/api/camera/status` menambah field `frozen` (stream beku: isi frame tidak berubah lebih dari 5 detik); UI menampilkan peringatan dengan tombol sambung ulang.
 - Tes baru `tests/test_galat.py` (7 tes).
+
+### Added (target 0.3.0)
+- Capture otomatis tingkat 1 (UC-13): setelan di toolbar Akuisisi (default mati). Aplikasi memotret dan menyimpan sendiri saat frame lolos gerbang berurutan: ada sel, meja diam, lapang baru (bukan duplikat citra tersimpan terakhir), fokus di puncak dan baik. Daftar gerbang tampil di atas stream; citra otomatis ditandai "O" di riwayat. CLIP mode bayangan (dicatat, tidak memblokir). Ambang di `config.py` (`AUTO_*`), masih heuristik.
+- Kolom `capture_mode` di `capture_log.csv` (`manual` / `otomatis-1`), dengan migrasi otomatis log lama. Daftar kolom di `tests/test_v010.py` ikut ditambah (perubahan format yang disengaja, bukan perekaman ulang snapshot).
+- Tes `tests/test_autocapture.py` (7 tes).
 - `static/js/app.js` dipecah apa adanya menjadi `common.js`, `capture.js`, `segmentation.js`, `main.js`. Backend tidak berubah.
 
 ### Added

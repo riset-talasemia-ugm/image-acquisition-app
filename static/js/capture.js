@@ -55,6 +55,10 @@ let currentCaptureFocus = null; // {status, relLow} kualitas fokus seluruh frame
 let focusPollBusy = false; // cegah request /api/focus/live menumpuk
 let focusMapKey = null; // "ROWSxCOLS" peta tile yang sudah dibangun
 let cameraFrozenShown = false;
+const autoToggle = document.getElementById("autoToggle");
+const autoPanel = document.getElementById("autoPanel");
+let autoBusy = false; // sedang memotret+menyimpan otomatis, jangan picu lagi
+let autoAccepted = 0;
 let isCameraConnected = false; // dipakai checkCameraStatus() buat deteksi kamera dicabut fisik
 
 async function loadCameras() {
@@ -362,17 +366,72 @@ async function pollFocusLive() {
   if (captureView.classList.contains("view-hidden")) return;
   focusPollBusy = true;
   try {
-    const res = await fetch("/api/focus/live");
+    const res = await fetch(autoToggle.checked ? "/api/focus/live?auto=1" : "/api/focus/live");
     const data = await res.json();
     if (data.ok) {
       renderFocusMap(data.quality);
       renderFocusStatus(data.quality);
       renderClipLine(data.clipState);
+      if (data.auto && autoToggle.checked) handleAutoGates(data.auto);
     }
   } catch (e) {
     // Abaikan error sesaat, polling berikutnya akan mencoba lagi.
   } finally {
     focusPollBusy = false;
+  }
+}
+
+// -----------------------------------------------------------------------
+// Capture otomatis tingkat 1 (UC-13). Gerbang dinilai server di setiap poll
+// fokus (autocapture.py); di sini hanya prasyarat sesi dan pemicu simpan.
+// -----------------------------------------------------------------------
+function autoBlocker() {
+  if (!patientNameInput.value.trim()) return "Isi inisial pasien dulu.";
+  if (!selectedFolder) return "Pilih lokasi simpan dulu.";
+  if (hasCapturedImage && !currentCaptureSaved) return "Simpan atau ambil ulang citra manual yang belum tersimpan dulu.";
+  return null;
+}
+
+function handleAutoGates(auto) {
+  const blocker = autoBlocker();
+  const title = document.getElementById("autoTitle");
+  const failing = auto.gates.find((g) => g.ok === false);
+  title.className = "auto-title" + (auto.ready && !blocker ? " auto-ready" : "");
+  title.textContent = blocker || (auto.ready ? "Memotret..." : "Menunggu: " + failing.label.toLowerCase());
+  document.getElementById("autoGates").innerHTML = auto.gates
+    .map((g) => {
+      const cls = g.ok === true ? "gate-ok" : g.ok === false ? "gate-fail" : "gate-wait";
+      const mark = g.ok === true ? "&check;" : g.ok === false ? "&times;" : "&ndash;";
+      const detail = g.detail ? `<span class="gate-detail">${g.detail}</span>` : "";
+      return `<li class="${cls}"><span class="gate-mark">${mark}</span><span>${g.label}</span>${detail}</li>`;
+    })
+    .join("");
+  if (auto.ready && !blocker && !autoBusy) autoCaptureAndSave();
+}
+
+async function autoCaptureAndSave() {
+  autoBusy = true;
+  try {
+    await doCapture();
+    if (!hasCapturedImage || currentCaptureSaved) return;
+    await doSave("otomatis");
+    if (currentCaptureSaved) {
+      autoAccepted += 1;
+      document.getElementById("autoAccepted").textContent = autoAccepted;
+      galleryStrip.lastElementChild.classList.add("gallery-auto");
+    }
+  } finally {
+    autoBusy = false;
+  }
+}
+
+function setAutoMode(on) {
+  autoToggle.checked = on;
+  autoPanel.classList.toggle("view-hidden", !on);
+  if (on) {
+    focusLiveToggle.checked = true; // gerbang dinilai lewat poll fokus live
+    document.getElementById("autoTitle").textContent = "Memeriksa lapang...";
+    document.getElementById("autoGates").innerHTML = "";
   }
 }
 
@@ -695,7 +754,8 @@ function updateSaveButtonState() {
   saveHint.textContent = missing.length ? "Sebelum simpan: " + missing.join(", ") + "." : "";
 }
 
-async function doSave() {
+// mode "otomatis" hanya dari autoCaptureAndSave; klik tombol/Enter selalu manual.
+async function doSave(mode) {
   const currentId = patientNameInput.value.trim();
 
   // Kalau ID pasien beda dari yang terakhir disimpan di sesi ini, konfirmasi
@@ -748,6 +808,7 @@ async function doSave() {
     body: JSON.stringify({
       patientName: currentId,
       folder: selectedFolder,
+      mode: mode === "otomatis" ? "otomatis" : "manual",
       cameraName,
       width,
       height,
